@@ -1,0 +1,51 @@
+NIMBUS PAYMENTS - Q2 FY2026 BUSINESS REVIEW
+(Fictional sample document for testing PreCue. All companies and numbers are made up.)
+
+1. Summary
+
+Nimbus Payments had a strong second quarter. Revenue grew to ₹10 crore, up 18% from ₹8.5 crore in Q1. We added 2.3 lakh new users, taking our total active users to 14.6 lakh. The transaction success rate improved by 12% compared to the previous quarter, and operational efficiency improved by 15% after we automated settlement reconciliation.
+
+2. Revenue
+
+Total revenue for Q2 was ₹10 crore. Merchant fees contributed ₹6.2 crore, which is 62% of revenue. Subscription plans contributed ₹2.5 crore and the remaining ₹1.3 crore came from value-added services such as instant settlements and analytics dashboards.
+
+Gross margin improved from 41% in Q1 to 46% in Q2, mainly because bank processing costs fell by ₹40 lakh after we renegotiated our contract with our primary banking partner.
+
+Revenue from Tier-2 and Tier-3 cities grew faster than metros. Tier-2 and Tier-3 cities now account for 38% of revenue, up from 31% last quarter.
+
+3. Customers
+
+We onboarded 2.3 lakh new users in Q2, compared to 1.7 lakh in Q1. Total active users reached 14.6 lakh. Monthly churn reduced from 4.1% to 3.2%.
+
+Merchant count grew to 52,000, an increase of 9,500 merchants in the quarter. Small retail stores make up 71% of our merchants. Our largest merchant segment by transaction value is food and grocery, at 34% of total value.
+
+Customer satisfaction (CSAT) rose to 4.5 out of 5, from 4.2 last quarter. Average support resolution time dropped from 18 hours to 7 hours after we launched the in-app help assistant.
+
+4. Operations and Technology
+
+The transaction success rate reached 97.4%, compared to 87.0% in Q1, an improvement of 12%. The main driver was smart routing, which sends each payment through the bank with the best live success rate.
+
+We processed 4.8 crore transactions worth ₹3,200 crore in total payment value. Peak load was 1,850 transactions per second during the festive sale in September.
+
+Operational efficiency improved by 15%. Settlement reconciliation, which earlier needed a team of 12 people, is now automated and needs only 3 people to handle exceptions. System uptime was 99.95%.
+
+5. Product Launches
+
+We launched three products this quarter:
+- UPI AutoPay for subscriptions, now used by 4,200 merchants.
+- Instant Settlement, which pays merchants within 30 minutes. It already contributes ₹45 lakh in monthly fees.
+- The Nimbus Analytics dashboard, used by 11,000 merchants every week.
+
+6. Team and Costs
+
+Headcount grew from 140 to 165 employees. Most hires were in engineering (15) and merchant support (7). Total operating expenses were ₹7.1 crore, up from ₹6.6 crore in Q1. Marketing spend was ₹1.2 crore, and the customer acquisition cost fell from ₹210 to ₹165 per user.
+
+7. Risks
+
+New RBI guidelines on payment aggregators require additional compliance reporting from Q4. We estimate a one-time cost of ₹35 lakh to update our systems.
+
+Competition in UPI payments is increasing, and two large competitors have cut merchant fees. We expect pricing pressure of around 5% on merchant fees over the next two quarters.
+
+8. Plan for Q3
+
+Our Q3 targets are revenue of ₹12 crore, 2.8 lakh new users and a transaction success rate above 98%. We plan to expand to 40 new Tier-2 cities, launch a credit line for merchants with a partner NBFC, and hire 20 more engineers. We are also preparing to raise a Series B round of around ₹150 crore by the end of FY2026.

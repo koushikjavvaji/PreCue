@@ -1,0 +1,36 @@
+"""Small JSON cache in data/cache, shared by every slow step.
+
+Slow steps (LLM calls, embedding a whole document) save their results here.
+The file name is a fingerprint of everything the result depends on, so if
+the document, the model or a setting changes, a new file is used and the
+old result is never wrongly reused.
+
+Delete the data/cache folder at any time to start fresh.
+"""
+
+import hashlib
+import json
+from pathlib import Path
+
+CACHE_FOLDER = Path("data/cache")
+
+
+def cache_file(kind, *parts):
+    """Return the cache path for this kind of result, e.g. cache_file("facts", model, document)."""
+    fingerprint = hashlib.sha256("\n".join(parts).encode()).hexdigest()[:16]
+    return CACHE_FOLDER / f"{kind}_{fingerprint}.json"
+
+
+def read_json(path):
+    """Return the saved data, or None if there is no (readable) file."""
+    if not path.exists():
+        return None
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None  # a broken cache is not fatal; we just do the work again
+
+
+def write_json(path, data):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
