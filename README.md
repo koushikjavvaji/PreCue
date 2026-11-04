@@ -154,9 +154,10 @@ Results (wrong claims caught, and false alerts: saying "wrong" when the speaker 
 |---|---|---|---|
 | `samples/eval_claims.json` (37, small sample) | 36/37 | 15/16 | 0/21 |
 | `samples/eval_claims_aurora.json` (111, hard: units, rounding, periods, directions, spoken numbers) | 109/111 | 40/42 | 0/69 |
+| the same 111 claims, with the report as a PDF | 108/111 | 39/42 | 0/69 |
 | `samples/eval_claims_injection.json` (10, booby-trapped document) | 10/10 | 3/3 | 0/7 |
 
-Measured with Gemini and Groq (`gpt-oss-20b`, backup `gpt-oss-120b`); both give similar results. When unsure, PreCue stays silent, so the misses are "not in the document" or "correct", never false alerts. A check takes 2-3 seconds on Groq. The Groq free tier allows 8,000 tokens per minute and 200,000 tokens a day per model (about 150 checks), so a full eval, which sends claims back to back, can hit the limit; add `--kinds` to check only some kinds of claims. These are fictional documents, so test with your own too.
+Measured with Gemini (`LIVE_LLM=gemini`), which has a bigger free daily quota. On Groq (`gpt-oss-20b`, backup `gpt-oss-120b`), before the period and direction rules were added, the hard set scored 100 of the 105 claims checked with 0 false alerts, and the booby-trapped set 9 of the 9 checked. When unsure, PreCue stays silent, so the misses are "not in the document" or "correct", never false alerts. A check takes 2-3 seconds on Groq. The Groq free tier allows 8,000 tokens per minute and 200,000 tokens a day per model (about 150 checks), so a full eval, which sends claims back to back, can hit the limit; add `--kinds` to check only some kinds of claims. These are fictional documents, so test with your own too.
 
 **Run the tests** (offline, a few seconds):
 
