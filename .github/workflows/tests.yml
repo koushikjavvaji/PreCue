@@ -32,6 +32,12 @@ jobs:
           pip install torch --index-url https://download.pytorch.org/whl/cpu
           pip install -r requirements.txt
 
+      - name: Check dependencies for known security problems
+        if: runner.os == 'Linux'
+        run: |
+          pip install pip-audit
+          pip-audit
+
       - name: Offline tests (no keys, no microphone)
         run: python -m pytest tests -q
 
