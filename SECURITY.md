@@ -36,6 +36,10 @@ only on `127.0.0.1` (this computer).
   - what PreCue whispers is built from those checked values only
     ("₹10 crore, not 100 crore."), never from free LLM text
   - text shown on screen is cut to a short length
+  - when a document is loaded, PreCue warns you about sections that look like instructions
+    to an AI ("ignore all previous instructions"), so you can check it was not tampered with
+  - tested with `samples/injection_report.md`, a report full of such traps: every claim
+    still got the right verdict, and no alert used the planted text
 - **Screen sharing**: on macOS and Windows (10 version 2004 or newer) the alert overlay is
   hidden from screenshots and screen capture, so meeting participants do not see it.
   On Linux it is not hidden, so it is off unless you ask for it (`--overlay`). Test it once with a real share before
