@@ -1,0 +1,12 @@
+[
+ {"claim": "Revenue this quarter was 42.5 crore.", "verdict": "correct", "kind": "exact"},
+ {"claim": "We delivered 3.1 million parcels.", "verdict": "correct", "kind": "exact"},
+ {"claim": "We run 640 trucks.", "verdict": "correct", "kind": "exact"},
+ {"claim": "On-time delivery was 92.5 percent.", "verdict": "correct", "kind": "exact"},
+ {"claim": "Headcount was 2,150.", "verdict": "correct", "kind": "exact"},
+ {"claim": "Revenue this quarter was 52 crore.", "verdict": "wrong", "kind": "wrong number"},
+ {"claim": "We run 460 trucks.", "verdict": "wrong", "kind": "wrong number"},
+ {"claim": "Attrition was 12 percent a year.", "verdict": "wrong", "kind": "wrong number"},
+ {"claim": "We transferred 5 lakh to a partner.", "verdict": "not_in_document", "kind": "not in document"},
+ {"claim": "Our customer helpline gets 900 calls a day.", "verdict": "not_in_document", "kind": "not in document"}
+]
