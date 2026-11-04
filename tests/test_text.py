@@ -52,3 +52,20 @@ def test_sections_and_positions():
     assert [c.metadata["section"] for c in chunks] == ["1. Revenue", "2. Costs"]
     for c in chunks:
         assert text[c.metadata["start"]:c.metadata["end"]] in c.page_content
+
+
+def test_a_split_table_keeps_its_column_names(monkeypatch):
+    from langchain_text_splitters import RecursiveCharacterTextSplitter
+
+    import app.chunker as chunker
+    from app.chunker import make_chunks, table_header_before
+
+    rows = "\n".join(f"| City {i} | ₹{i}.5 crore | {i}% |" for i in range(40))
+    text = f"# Report\n\n## 2. Cities\n\nRevenue by city.\n\n| City | Q2 revenue | Growth |\n|---|---|---|\n{rows}\n"
+    monkeypatch.setattr(chunker, "splitter", RecursiveCharacterTextSplitter(chunk_size=300, chunk_overlap=0, separators=["\n\n", "\n"]))
+    chunks = make_chunks(text, source="report.md")
+    assert len(chunks) > 3
+    for chunk in chunks:
+        if "City 3" in chunk.page_content or "City 39" in chunk.page_content:
+            assert "| City | Q2 revenue | Growth |\n|---|---|---|" in chunk.page_content
+    assert table_header_before(text, text.index("Revenue by city")) == ""

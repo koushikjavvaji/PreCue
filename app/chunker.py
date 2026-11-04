@@ -30,6 +30,8 @@ from app.errors import PreCueError
 CHUNK_SIZE = 800  # max characters of section text per chunk (about 130-150 words)
 CHUNK_OVERLAP = 100  # characters shared between chunks when a big section is split
 MAX_HEADING_LENGTH = 80
+# Raise this when the way chunks are made changes, so saved indexes are rebuilt (see index.py).
+CHUNKER_VERSION = "2"  # 2: split tables repeat their column names
 
 NUMBERED_HEADING = re.compile(r"^(\d+(?:\.\d+)*)[.)]?\s+\S")  # "2. Revenue", "2.1 Details"
 
@@ -133,6 +135,24 @@ def split_into_sections(text, default_title=""):
     return title, sections
 
 
+def table_header_before(text, start):
+    """If the text at `start` is in the middle of a markdown table, return that table's header lines.
+
+    "| Revenue | ₹112.4 crore | ₹131.2 crore |" alone does not say which column is which quarter.
+    The header is the row just above the "|---|" line. Returns "" when not inside a table.
+    """
+    if not text[start:].lstrip(" ").startswith("|"):
+        return ""
+    above = text[:start].rstrip("\n").split("\n")
+    for i in range(len(above) - 1, 0, -1):
+        line = above[i].strip()
+        if not line.startswith("|"):
+            return ""  # the table starts inside this piece, so the piece has the header itself
+        if set(line) <= set("|-: "):  # the "|---|---|" line under the column names
+            return f"{above[i - 1].strip()}\n{line}"
+    return ""
+
+
 def make_chunks(text, source):
     """Split text into a list of LangChain Documents, section by section.
 
@@ -162,6 +182,9 @@ def make_chunks(text, source):
                 "start": start,
                 "end": start + len(piece),
             }
-            chunks.append(Document(page_content=f"{header}\n{piece}", metadata=info))
+            # A long table split into pieces: repeat its column names, or "38.5%" means nothing.
+            columns = table_header_before(text, start)
+            body = f"{columns}\n{piece}" if columns else piece
+            chunks.append(Document(page_content=f"{header}\n{body}", metadata=info))
 
     return chunks

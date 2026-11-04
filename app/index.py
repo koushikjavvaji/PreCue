@@ -10,7 +10,7 @@ The next run with the same document, mode and models loads it instantly.
 from langchain_core.documents import Document
 
 from app.cache import cache_file, read_json, write_json
-from app.chunker import CHUNK_OVERLAP, CHUNK_SIZE, load_text, make_chunks
+from app.chunker import CHUNK_OVERLAP, CHUNK_SIZE, CHUNKER_VERSION, load_text, make_chunks
 from app.contextualizer import add_context
 from app.errors import PreCueError
 from app.llm import get_gemini, model_name
@@ -31,7 +31,7 @@ def build_index(path, mode, embedder):
         llm_name = model_name(llm)
 
     # Everything the index depends on goes into the cache file name.
-    settings = [mode, embedder.model_name, llm_name, str(CHUNK_SIZE), str(CHUNK_OVERLAP)]
+    settings = [mode, embedder.model_name, llm_name, str(CHUNK_SIZE), str(CHUNK_OVERLAP), CHUNKER_VERSION]
     path_on_disk = cache_file("index", *settings, text)
     saved = read_json(path_on_disk)
     if saved:
