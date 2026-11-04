@@ -20,6 +20,8 @@ No extra libraries: only the Python standard library and plain JavaScript.
 
 import json
 import queue
+import socket
+import sys
 import threading
 from collections import deque
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -35,13 +37,29 @@ PING_SECONDS = 15  # a small "still here" message so the browser keeps the conne
 MAX_WAITING = 500  # events waiting for one slow page; more are dropped instead of filling the memory
 
 
+class PrivateServer(ThreadingHTTPServer):
+    """The web server, with its port kept for PreCue alone.
+
+    Python's server allows "address reuse". On Windows that lets another program bind the
+    same port and take over the connections (and read the transcript), so there we ask
+    Windows for exclusive use of the port instead.
+    """
+
+    allow_reuse_address = sys.platform != "win32"
+
+    def server_bind(self):
+        if sys.platform == "win32":
+            self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
+        super().server_bind()
+
+
 class LiveScreen:
     def __init__(self, port=8765):
         self.clients = []  # one queue per open browser tab
         self.history = deque(maxlen=HISTORY)
         self.lock = threading.Lock()  # clients and history are used from several threads
         try:
-            self.server = ThreadingHTTPServer(("127.0.0.1", port), self._make_handler())
+            self.server = PrivateServer(("127.0.0.1", port), self._make_handler())
         except OSError as error:
             raise PreCueError(f"Could not start the live screen on port {port}: {error}") from error
         self.url = f"http://127.0.0.1:{port}"

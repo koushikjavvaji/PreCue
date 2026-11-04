@@ -148,9 +148,14 @@ def listen(stt, audio_queue, meeting):
             raise PreCueError(f"Gave up after {MAX_RECONNECTS} reconnects. Last problem: {reason}")
         wait = min(2**failures, 30)  # 2, 4, 8, 16, 30 seconds
         meeting.status(f"Connection lost, reconnecting in {wait}s...", "reconnecting")
-        time.sleep(wait)
+        pause(wait)
         while not audio_queue.empty():  # drop the audio from the outage; we want to be live again
             audio_queue.get_nowait()
+
+
+def pause(seconds):
+    """Wait before reconnecting. (A function of its own, so tests can skip the waiting.)"""
+    time.sleep(seconds)
 
 
 def use_overlay(args):

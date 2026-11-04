@@ -220,7 +220,7 @@ def test_mic_is_ignored_during_whisper_only_on_speakers(monkeypatch):
 
 def test_reconnect_waits_longer_each_time_then_gives_up(monkeypatch):
     waits = []
-    monkeypatch.setattr(live.time, "sleep", lambda seconds: waits.append(seconds) if seconds != 0.5 else None)
+    monkeypatch.setattr(live, "pause", waits.append)
 
     class AlwaysDown:
         def listen(self, audio_queue):
@@ -236,7 +236,7 @@ def test_reconnect_waits_longer_each_time_then_gives_up(monkeypatch):
 
 
 def test_reconnect_count_resets_after_a_working_connection(monkeypatch):
-    monkeypatch.setattr(live.time, "sleep", lambda seconds: None)
+    monkeypatch.setattr(live, "pause", lambda seconds: None)
 
     class Flaky:
         attempts = 0
