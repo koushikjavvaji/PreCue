@@ -1,0 +1,42 @@
+name: tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  tests:
+    name: tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install PortAudio (Linux, for the microphone library)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libportaudio2
+
+      - name: Install dependencies
+        shell: bash
+        run: |
+          python -m pip install --upgrade pip
+          # the CPU-only build of torch: much smaller, and the tests need no GPU
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install -r requirements.txt
+
+      - name: Offline tests (no keys, no microphone)
+        run: python -m pytest tests -q
+
+      - name: Windows overlay with real windows (hidden from screen capture)
+        if: runner.os == 'Windows'
+        env:
+          PRECUE_UI_TESTS: "1"
+        run: python -m pytest tests/test_overlay_tk.py -v

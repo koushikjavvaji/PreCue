@@ -1,5 +1,7 @@
 # PreCue
 
+[![tests](https://github.com/koushikjavvaji/PreCue/actions/workflows/tests.yml/badge.svg)](https://github.com/koushikjavvaji/PreCue/actions/workflows/tests.yml)
+
 **A real-time AI voice copilot that listens, understands, verifies, and assists you during important conversations through intelligent visual alerts and private audio whispers.**
 
 PreCue is not another voice chatbot. It is a real-time communication assistant that stays almost invisible until you need it.
