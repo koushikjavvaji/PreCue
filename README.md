@@ -74,9 +74,10 @@ Early stage. Built so far:
 - **Decision engine** (LangGraph): stay silent, alert on a wrong number, or suggest the next point when you pause; never repeats itself
 - **Whispers**: alerts and suggestions spoken into your earphones (Deepgram Aura text-to-speech)
 - **Live screen**: a local web page with the transcript, alerts and suggestions
+- **Meeting overlay** (macOS): alerts pop up in a small floating window on top of every app, also full-screen Zoom and slideshows. It is click-through, never takes the focus, fades after a few seconds and is **hidden from screen sharing**: the people in the meeting never see it
 - **Built for long meetings**: keeps the connection alive through silence, reconnects after network drops, joins sentences split by a pause
 - **Short phrases end on time**: after 0.8 s of silence PreCue asks Deepgram to finish the sentence, so "99 percent." is not glued to the next sentence
-- **Automated tests**: 55 offline tests (no keys, no microphone) for the decision engine, fact-check safety rules, chunking, speech events, reconnects, the live screen and whispers
+- **Automated tests**: 65 offline tests (no keys, no microphone), plus 13 real-window overlay tests, for the decision engine, fact-check safety rules, chunking, speech events, reconnects, the live screen, whispers and the overlay
 
 Coming next: PDF support, more document formats, security review.
 
@@ -117,11 +118,12 @@ Optional settings in `.env`:
 
 Run all commands from the project folder.
 
-**Live copilot (the main app).** Prepares the document, opens the live screen in your browser and starts listening. Use earphones: on laptop speakers the meeting could hear the whispers.
+**Live copilot (the main app).** Prepares the document, starts listening and shows alerts in a small pop-up window in the top-right corner of your screen, on top of your meeting and hidden from screen sharing. The full page with the transcript is at the printed "Live screen" address. Use earphones: on laptop speakers the meeting could hear the whispers.
 
 ```bash
 python -m scripts.live_copilot samples/sample_report.txt
-python -m scripts.live_copilot samples/sample_report.txt --no-voice    # screen only, no whispers
+python -m scripts.live_copilot samples/sample_report.txt --no-voice    # pop-ups only, no whispers
+python -m scripts.live_copilot samples/sample_report.txt --no-overlay  # browser tab instead of pop-ups
 ```
 
 | You say | PreCue does |
@@ -145,6 +147,14 @@ On the sample, the checker gets 36-37 of the 37 claims right (correct, wrong and
 ```bash
 python -m pytest tests
 ```
+
+The overlay tests open real windows and take screenshots, so they run only when asked (macOS, and your terminal needs Screen Recording permission). They check that alerts are visible to you, also over a full-screen app, and invisible to screenshots and to ScreenCaptureKit, the screen capture that Zoom, Teams and Chrome use:
+
+```bash
+PRECUE_UI_TESTS=1 python -m pytest tests
+```
+
+Before an important meeting, also try a real screen share once: share your whole screen in Zoom or Meet with a second device in the call, trigger an alert, and check that the second device does not see it.
 
 **Live transcription.** Speak and watch the text appear. Press Ctrl+C to stop.
 
@@ -215,9 +225,11 @@ app/
   copilot.py        Decision engine (LangGraph): silent, alert or suggest
   voice.py          Whispers (text-to-speech to your earphones)
   screen.py         Live screen (local web server)
+  overlay.py        Meeting overlay: floating pop-up window, hidden from screen sharing (macOS)
   errors.py         PreCue's error types
 web/
   index.html        The live screen page
+  overlay.html      The pop-up page shown in the overlay
 tests/              Offline tests (fake LLM, search and Deepgram)
 scripts/
   live_copilot.py   The main app

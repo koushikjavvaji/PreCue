@@ -3,10 +3,13 @@
 How it works:
   - Python's built-in web server runs in a background thread on
     http://127.0.0.1:8765 (127.0.0.1 = only this computer can open it).
-  - "/" sends the page (web/index.html).
+  - "/" sends the full page (web/index.html): transcript, alerts, suggestions.
+  - "/overlay" sends the small pop-up page (web/overlay.html) that the
+    floating overlay window shows during the meeting (see overlay.py).
   - "/events" stays open and pushes every new event to the page as it
     happens (Server-Sent Events: the browser keeps listening, the server writes).
   - A page opened late still sees the recent history (we replay it).
+    "/events?live=1" skips the history: the pop-up must never show old alerts.
 
 No extra libraries: only the Python standard library and plain JavaScript.
 """
@@ -17,10 +20,12 @@ import threading
 from collections import deque
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from urllib.parse import parse_qs, urlparse
 
 from app.errors import PreCueError
 
-PAGE = Path(__file__).parent.parent / "web" / "index.html"
+WEB = Path(__file__).parent.parent / "web"
+PAGES = {"/": WEB / "index.html", "/overlay": WEB / "overlay.html"}
 HISTORY = 200  # events replayed to a page that opens late
 PING_SECONDS = 15  # a small "still here" message so the browser keeps the connection
 
@@ -50,22 +55,24 @@ class LiveScreen:
 
         class Handler(BaseHTTPRequestHandler):
             def do_GET(self):
-                if self.path == "/":
-                    self._send_page()
-                elif self.path == "/events":
-                    self._stream_events()
+                url = urlparse(self.path)  # "/events?live=1" -> path "/events", query "live=1"
+                if url.path in PAGES:
+                    self._send_page(PAGES[url.path])
+                elif url.path == "/events":
+                    live_only = parse_qs(url.query).get("live") == ["1"]
+                    self._stream_events(replay=not live_only)
                 else:
                     self.send_error(404)
 
-            def _send_page(self):
-                body = PAGE.read_bytes()
+            def _send_page(self, page):
+                body = page.read_bytes()
                 self.send_response(200)
                 self.send_header("Content-Type", "text/html; charset=utf-8")
                 self.send_header("Content-Length", str(len(body)))
                 self.end_headers()
                 self.wfile.write(body)
 
-            def _stream_events(self):
+            def _stream_events(self, replay):
                 self.send_response(200)
                 self.send_header("Content-Type", "text/event-stream")
                 self.send_header("Cache-Control", "no-cache")
@@ -73,8 +80,9 @@ class LiveScreen:
 
                 client = queue.Queue()
                 with screen.lock:
-                    for event in screen.history:  # catch up on what happened before the page opened
-                        client.put(event)
+                    if replay:
+                        for event in screen.history:  # catch up on what happened before the page opened
+                            client.put(event)
                     screen.clients.append(client)
                 try:
                     while True:

@@ -4,6 +4,11 @@ Run from the project folder:
   python -m scripts.live_copilot samples/sample_report.txt
   python -m scripts.live_copilot samples/sample_report.txt --no-voice     (screen only)
   python -m scripts.live_copilot samples/sample_report.txt --no-screen    (terminal + whispers)
+  python -m scripts.live_copilot samples/sample_report.txt --no-overlay   (browser tab instead of pop-ups)
+
+Alerts pop up in a small floating window on top of your meeting (overlay.py),
+hidden from screen sharing. The full page with the transcript is at the
+printed "Live screen" address.
 
 What runs at the same time (threads):
   main thread    : microphone -> Deepgram -> sentences            (never waits for the LLM)
@@ -11,11 +16,13 @@ What runs at the same time (threads):
   pause thread   : notices when you have been quiet for PAUSE_SECONDS
   whisper thread : plays whispers one at a time            (inside voice.py)
   screen threads : the local web page                      (inside screen.py)
+  overlay        : its own process, the floating pop-up window (overlay.py)
 """
 
 import argparse
 import os
 import queue
+import sys
 import threading
 import time
 import webbrowser
@@ -27,6 +34,7 @@ from app.errors import ConnectionLostError, PreCueError
 from app.index import MODES
 from app.llm import get_live_llm, model_name
 from app.mic import open_mic
+from app.overlay import start_overlay, stop_overlay
 from app.prepare import prepare
 from app.screen import LiveScreen
 from app.stt import DeepgramSTT
@@ -153,7 +161,8 @@ def main():
     parser.add_argument("file", help="the document for this meeting (.txt or .md)")
     parser.add_argument("--mode", choices=MODES, default="plain")
     parser.add_argument("--no-voice", action="store_true", help="no whispers, screen only")
-    parser.add_argument("--no-screen", action="store_true", help="no web page")
+    parser.add_argument("--no-screen", action="store_true", help="no web page and no pop-ups")
+    parser.add_argument("--no-overlay", action="store_true", help="open a browser tab instead of the pop-up window")
     args = parser.parse_args()
 
     load_dotenv()
@@ -168,10 +177,14 @@ def main():
     print(f"Ready: {len(retriever.chunks)} chunks, {len(facts)} facts, live LLM {model_name(llm)}")
 
     screen = None
+    overlay = None
     if not args.no_screen:
         screen = LiveScreen()
         print(f"Live screen: {screen.url}")
-        webbrowser.open(screen.url)
+        if args.no_overlay or sys.platform != "darwin":  # the overlay is macOS only for now
+            webbrowser.open(screen.url)
+        else:
+            overlay = start_overlay(screen.url)
 
     whisperer = None
     if not args.no_voice:
@@ -195,6 +208,8 @@ def main():
     finally:
         if whisperer:
             whisperer.stop()  # end a whisper cleanly instead of cutting the audio device off
+        if overlay:
+            stop_overlay(overlay)  # close the pop-up window with the app
 
 
 if __name__ == "__main__":

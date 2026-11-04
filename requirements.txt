@@ -14,3 +14,9 @@ langchain-groq>=1.0
 langgraph>=1.0
 numpy>=1.26
 pytest>=8.0
+# macOS only: the meeting overlay window (AppKit, WebKit) and its screen-capture tests
+pyobjc-framework-Cocoa>=10.0; sys_platform == "darwin"
+pyobjc-framework-WebKit>=10.0; sys_platform == "darwin"
+pyobjc-framework-Quartz>=10.0; sys_platform == "darwin"
+pyobjc-framework-ScreenCaptureKit>=10.0; sys_platform == "darwin"
+pillow>=10.0
