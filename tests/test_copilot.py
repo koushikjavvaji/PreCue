@@ -229,3 +229,53 @@ def test_spoken_number_words_become_digits_before_the_check():
     copilot, llm = make_copilot(CORRECT)
     copilot.handle("sentence", "Revenue was one hundred crore.")
     assert "Revenue was 100 crore." in llm.prompts[-1]
+
+
+ATTRITION = [chunk(4, "8. People", "Annualized attrition was 14.5%, down from 17.0% in FY2025.")]
+
+
+@pytest.mark.parametrize("llm_verdict", ["wrong", "correct"])
+def test_backwards_direction_is_an_alert(llm_verdict):
+    llm = FakeLLM({"verdict": llm_verdict, "said": "14.5 percent", "document_says": "14.5%",
+                   "section": "8. People", "change": "down"})
+    verdict = check_claim("Attrition rose to 14.5 percent", ATTRITION, FakeFacts(), llm)
+    assert (verdict["verdict"], verdict["problem"]) == ("wrong", "direction")
+
+
+def test_right_direction_is_correct():
+    llm = FakeLLM({"verdict": "wrong", "said": "14.5 percent", "document_says": "14.5%",
+                   "section": "8. People", "change": "down"})
+    assert check_claim("Attrition fell to 14.5 percent", ATTRITION, FakeFacts(), llm)["verdict"] == "correct"
+    assert check_claim("Attrition is 14.5 percent", ATTRITION, FakeFacts(), llm)["verdict"] == "correct"
+
+
+def test_direction_alert_is_built_from_a_template():
+    people = chunk(2, "8. People", "Annualized attrition was 14.5%, down from 17.0% in FY2025.")
+    retriever = FakeRetriever([CHUNKS[0], people, CHUNKS[2], CHUNKS[3]])
+    llm = FakeLLM({"verdict": "correct", "said": "14.5 percent", "document_says": "14.5%",
+                   "section": "8. People", "change": "down"})
+    result = Copilot(retriever, FakeFacts(), llm).handle("sentence", "Attrition rose to 14.5 percent.")
+    assert result["action"] == "alert"
+    assert result["spoken"] == "It went down, not up."
+    assert result["message"] == "It went down, not up: the document says 14.5% (8. People)."
+
+
+class QuarterFacts(FakeFacts):
+    def for_claim(self, claim, chunks, from_chunks=10, closest=5):
+        return [{"metric": "E-commerce revenue", "value": "₹37.2 crore", "period": "Q2 FY2026", "section": "3. Channels", "chunk": 2},
+                {"metric": "Revenue", "value": "₹131.2 crore", "period": "Q1 FY2026", "section": "2. Finance", "chunk": 2}]
+
+
+CHANNELS = [chunk(2, "3. Channels", "E-commerce contributed ₹37.2 crore. Revenue was ₹131.2 crore in Q1.")]
+
+
+def test_value_from_another_quarter_is_not_an_alert():
+    llm = FakeLLM({**WRONG, "said": "30 crore", "document_says": "₹37.2 crore"})
+    assert check_claim("Online sales were 30 crore in Q1", CHANNELS, QuarterFacts(), llm)["verdict"] == "not_in_document"
+
+
+def test_value_from_the_same_quarter_is_an_alert():
+    llm = FakeLLM({**WRONG, "said": "120 crore", "document_says": "₹131.2 crore"})
+    assert check_claim("Revenue in Q1 was 120 crore", CHANNELS, QuarterFacts(), llm)["verdict"] == "wrong"
+    llm = FakeLLM({**WRONG, "said": "30 crore", "document_says": "₹37.2 crore"})
+    assert check_claim("Online sales were 30 crore", CHANNELS, QuarterFacts(), llm)["verdict"] == "wrong"  # no quarter named

@@ -172,9 +172,18 @@ class Copilot:
         # Built only from short, checked values, never from free LLM text: a booby-trapped
         # document must not be able to make PreCue say anything else in your ear.
         said, real = short(spoken_value(verdict["said"])), short(verdict["document_says"])
+        section = short(section_name(verdict["section"]))
+        if verdict.get("problem") == "direction":
+            went, not_went = verdict["change"], "up" if verdict["change"] == "down" else "down"
+            return {
+                "action": "alert",
+                "message": f"It went {went}, not {not_went}: the document says {real} ({section}).",
+                "spoken": f"It went {went}, not {not_went}.",
+                "alerted": state["alerted"] + [key],
+            }
         return {
             "action": "alert",
-            "message": f"You said {said}, the document says {real} ({short(section_name(verdict['section']))}).",
+            "message": f"You said {said}, the document says {real} ({section}).",
             "spoken": f"{real}, not {said}.",
             "alerted": state["alerted"] + [key],
         }

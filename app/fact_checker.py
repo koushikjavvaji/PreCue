@@ -12,6 +12,10 @@ Golden rule: a wrong alert is worse than no alert. So:
     document really appears in the chunks or facts (the LLM cannot invent the correction)
   - a "wrong" verdict is dropped if both values are the same amount in other units
     ("24 lakh" = "2.4 million") or a fair rounding of a hedged claim ("about 1,200" for 1,240)
+  - a "wrong" verdict is dropped if the claim names a quarter and the document's value is
+    from another quarter (the facts table says which)
+  - the same number with the direction backwards ("rose to 14.5%" when it fell) is "wrong",
+    with problem "direction": the code compares the claim's words with the document's change
 """
 
 import re
@@ -20,9 +24,9 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 from app.errors import PreCueError
-from app.facts import fact_text, is_grounded
+from app.facts import fact_text, is_grounded, numbers_in
 from app.llm import LLM_ERRORS, llm_error, structured
-from app.numbers import is_hedged, same_value
+from app.numbers import direction_of, is_hedged, same_value
 
 
 CHUNK_FACTS = 10  # at most this many facts from the found chunks (closest to the claim first)
@@ -38,6 +42,10 @@ class Verdict(BaseModel):
         "Empty if the document does not give it"
     )
     section: str = Field(description="The document section with that value. Empty if not found")
+    change: Literal["up", "down", "none"] = Field(
+        description="Whether the document says this value went up or down (e.g. 'down from 17.0%' is down). "
+        "'none' if it does not say"
+    )
 
 
 PROMPT = """You check what a speaker says in a meeting against their own document.
@@ -64,6 +72,17 @@ Decide:
   ("about 10 crore" for "₹10 crore", "97 percent" for "97.4%").
 - "wrong": the document clearly gives a different value for exactly the same metric and the same period.
 - "not_in_document": the document does not cover this, or you are not sure.
+Periods matter. First find the claim's period, then compare with the document's value for
+that same period:
+  - "this quarter", "now", "is", or no period at all: the document's own period (in its title)
+  - "last quarter" or "previous quarter": the quarter before it (e.g. Q1 for a Q2 report)
+  - "last year": the same quarter a year earlier; "target", "plan", "guidance": the target
+A value from another period said as the claim's period is "wrong"; document_says is then
+the value for the claim's period. A value of an earlier period said for that earlier period
+is "correct" ("last quarter's revenue was 131.2 crore" in a Q2 report that gives Q1 as 131.2).
+Direction matters. If the claim says a metric rose but the document says it fell (or the
+other way round), it is "wrong", even if the number is right. In "change", say whether the
+document says the value went up or down.
 A similar but different metric is NOT the same metric (for example, a rating from one
 source is not a rating from another source, and new hires are not total headcount).
 If the document only has a similar metric, answer "not_in_document".
@@ -88,10 +107,36 @@ def check_claim(claim, results, facts, llm):
     evidence = chunks_text + "\n" + facts_text  # facts are already checked against their chunks
     if verdict["verdict"] == "wrong" and not _is_trustworthy(verdict["document_says"], evidence):
         verdict["verdict"] = "not_in_document"  # the LLM's "correct value" is not in the document
-    if verdict["verdict"] == "wrong" and _same_value(claim, verdict):
-        verdict["verdict"] = "correct"  # "24 lakh" for "2.4 million": the same amount, said another way
+    if verdict["verdict"] == "wrong" and _other_quarter(claim, verdict["document_says"], rows):
+        verdict["verdict"] = "not_in_document"  # "30 crore in Q1" vs the Q2 value: no Q1 value to compare
+    verdict["problem"] = "value" if verdict["verdict"] == "wrong" else ""
+    if verdict["verdict"] in ("wrong", "correct") and _same_value(claim, verdict):
+        # The right number. Wrong only if the speaker got the direction backwards ("rose" when it fell).
+        said_direction = direction_of(claim)
+        backwards = said_direction and verdict["change"] != "none" and said_direction != verdict["change"]
+        if backwards and _is_trustworthy(verdict["document_says"], evidence):
+            verdict["verdict"], verdict["problem"] = "wrong", "direction"
+        else:
+            verdict["verdict"], verdict["problem"] = "correct", ""  # "24 lakh" for "2.4 million": the same amount
     verdict["claim"] = claim
     return verdict
+
+
+QUARTER = re.compile(r"\b(Q[1-4]|H[12])\b", re.IGNORECASE)
+
+
+def _other_quarter(claim, document_says, rows):
+    """True if the claim names a quarter, and the document's value belongs to a different quarter.
+
+    "Online sales were 30 crore in Q1" checked against "₹37.2 crore" (a Q2 fact) is not a
+    contradiction: the document has no Q1 value. The facts table knows each value's period.
+    """
+    said = {quarter.upper() for quarter in QUARTER.findall(claim)}
+    matching = [fact for fact in rows if numbers_in(document_says) and numbers_in(fact["value"]) == numbers_in(document_says)]
+    if not said or not matching:
+        return False
+    periods = [{quarter.upper() for quarter in QUARTER.findall(fact["period"])} for fact in matching]
+    return all(period and not period & said for period in periods)
 
 
 def _same_value(claim, verdict):

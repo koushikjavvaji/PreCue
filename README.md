@@ -69,11 +69,13 @@ Early stage. Built so far:
 - **Contextual retrieval** (an LLM writes a short context for each chunk) using Gemini
 - **Embeddings** with a local model, in three modes: `plain`, `contextual` and `late` (late chunking, also for long documents)
 - **Hybrid search**: vector search plus BM25 keyword search for questions with numbers, merged with Reciprocal Rank Fusion
-- **Facts table**: every number-based fact in the document, extracted by Gemini and checked against the text
+- **Facts table**: every number-based fact in the document, extracted by Gemini (several chunks per call) and checked against the text
+- **Number sense**: spoken number words become digits ("ninety-six" → 96), and the same amount in other units is not an error (24 lakh = 2.4 million, ₹148.6 crore = 1,486 million rupees). "About 1,200" for 1,240 is fine; "1,200" said exactly is not
+- **Periods and directions**: "this quarter" vs "last quarter" vs a target, and "rose" when the document says it fell, are caught; a claim about a quarter the document does not cover is never compared with another quarter
 - **Saved index**: chunks and vectors are cached, so a document is only processed once
 - **Evaluation**: a question set and a script that scores every mode and search method
 - **LangSmith tracing** (optional)
-- **Live fact-checking**: each spoken sentence with a number is checked against the document by a fast LLM (Groq)
+- **Live fact-checking**: each spoken sentence with a number is checked against the document by a fast LLM (Groq). When it hits its free-tier limit, a backup Groq model takes over at once
 - **Decision engine** (LangGraph): stay silent, alert on a wrong number, or suggest the next point when you pause; never repeats itself
 - **Whispers**: alerts and suggestions spoken into your earphones (Deepgram Aura text-to-speech)
 - **Live screen**: a local web page with the transcript, alerts and suggestions
@@ -81,13 +83,13 @@ Early stage. Built so far:
 - **Security**: see [SECURITY.md](SECURITY.md) for where your data goes and what PreCue protects against
 - **Built for long meetings**: keeps the connection alive through silence, reconnects after network drops, joins sentences split by a pause
 - **Short phrases end on time**: after 0.8 s of silence PreCue asks Deepgram to finish the sentence, so "99 percent." is not glued to the next sentence
-- **Automated tests**: 65 offline tests (no keys, no microphone), plus 13 real-window overlay tests, for the decision engine, fact-check safety rules, chunking, speech events, reconnects, the live screen, whispers and the overlay
+- **Automated tests**: 188 offline tests (no keys, no microphone), plus real-window overlay tests, for the decision engine, fact-check safety rules, number handling, chunking, documents, speech events, reconnects, the live screen, whispers and the overlay. They run on macOS, Windows and Linux on every push
 
 Coming next: scanned PDFs (OCR), charts and images inside documents.
 
 ## Setup
 
-Requires Python 3.11+ and a microphone. Tested on macOS.
+Requires Python 3.11+ and a microphone. Used on macOS; the tests also run on Windows and Linux.
 
 ```bash
 git clone https://github.com/koushikjavvaji/PreCue.git
@@ -146,7 +148,15 @@ python -m scripts.check_claims samples/sample_report.txt
 python -m scripts.check_claims samples/sample_report.txt --eval samples/eval_claims.json
 ```
 
-On the sample, the checker gets 36-37 of the 37 claims right (correct, wrong and not in the document) with 0 false alerts, on both Groq and Gemini. A check takes 2-3 seconds on Groq. The Groq free tier allows 8,000 tokens per minute (about 4-6 checks) and 1,000 requests per day, so the eval, which sends all 37 claims back to back, slows down to about 10 seconds per claim; a real meeting does not. The last 12 claims were added after tuning, as a fair check. The sample is small, so test with your own documents too.
+Results (wrong claims caught, and false alerts: saying "wrong" when the speaker was right, the worst mistake):
+
+| Claims | Accuracy | Wrong claims caught | False alerts |
+|---|---|---|---|
+| `samples/eval_claims.json` (37, small sample) | 36/37 | 15/16 | 0/21 |
+| `samples/eval_claims_aurora.json` (111, hard: units, rounding, periods, directions, spoken numbers) | 109/111 | 40/42 | 0/69 |
+| `samples/eval_claims_injection.json` (10, booby-trapped document) | 10/10 | 3/3 | 0/7 |
+
+Measured with Gemini and Groq (`gpt-oss-20b`, backup `gpt-oss-120b`); both give similar results. When unsure, PreCue stays silent, so the misses are "not in the document" or "correct", never false alerts. A check takes 2-3 seconds on Groq. The Groq free tier allows 8,000 tokens per minute and 200,000 tokens a day per model (about 150 checks), so a full eval, which sends claims back to back, can hit the limit; add `--kinds` to check only some kinds of claims. These are fictional documents, so test with your own too.
 
 **Run the tests** (offline, a few seconds):
 
@@ -226,6 +236,8 @@ app/
   index.py          Builds and caches a document's chunks and vectors
   retriever.py      Hybrid search (vectors + BM25, merged with RRF)
   facts.py          Facts table
+  numbers.py        Spoken numbers, units (lakh, crore, million) and rounding
+  injection.py      Spots hidden instructions to an AI in a document
   cache.py          JSON cache in data/cache
   prepare.py        Everything done with a document before the meeting
   fact_checker.py   Checks one spoken claim against the document
@@ -248,9 +260,9 @@ scripts/
   evaluate.py
   make_sample_documents.py
 samples/
-  sample_report.txt (.pdf, .docx, .pptx)
-  eval_questions.json
-  eval_claims.json
+  sample_report.txt (.pdf, .docx, .pptx)  the small sample, with eval_questions.json and eval_claims.json
+  aurora_report.md  a harder 12-section report, with eval_questions_aurora.json and eval_claims_aurora.json
+  injection_report.md  a booby-trapped report, with eval_claims_injection.json
 ```
 
 ## License

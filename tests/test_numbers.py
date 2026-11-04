@@ -16,6 +16,10 @@ from app.numbers import is_hedged, same_value, values_in, words_to_digits
     ("Revenue was 148.6 crore.", "Revenue was 148.6 crore."),  # digits stay digits
     ("twenty five", "25"),
     ("two hundred and five stores", "205 stores"),
+    ("twenty-four lakh packs", "24 lakh packs"),
+    ("Ninety-six people.", "96 people."),
+    ("a one-time upgrade", "a one-time upgrade"),
+    ("one point eight five lakh outlets", "1.85 lakh outlets"),
 ])
 def test_words_to_digits(spoken, expected):
     assert words_to_digits(spoken) == expected
@@ -53,3 +57,13 @@ def test_is_hedged(text, expected):
 
 def test_periods_are_not_values():
     assert values_in("Revenue in Q2 FY2026 was ₹148.6 crore") == [(1_486_000_000.0, False)]
+
+
+@pytest.mark.parametrize("text, expected", [
+    ("Attrition rose to 14.5 percent", "up"), ("Inventory days are down to about 40", "down"),
+    ("Revenue was 148.6 crore", ""), ("Gross margin improved to 38.5%", ""),
+    ("Sales rose while costs fell", ""),
+])
+def test_direction_of(text, expected):
+    from app.numbers import direction_of
+    assert direction_of(text) == expected

@@ -66,5 +66,5 @@ class FakeLLM:
         return Verdict(**self.verdict)
 
 
-WRONG = {"verdict": "wrong", "said": "100 crore", "document_says": "₹10 crore", "section": "2. Revenue"}
-CORRECT = {"verdict": "correct", "said": "10 crore", "document_says": "₹10 crore", "section": "2. Revenue"}
+WRONG = {"verdict": "wrong", "said": "100 crore", "document_says": "₹10 crore", "section": "2. Revenue", "change": "none"}
+CORRECT = {"verdict": "correct", "said": "10 crore", "document_says": "₹10 crore", "section": "2. Revenue", "change": "none"}

@@ -34,6 +34,7 @@ def main():
     parser.add_argument("file", help="the document (.txt, .md, .pdf, .docx or .pptx)")
     parser.add_argument("--mode", choices=MODES, default="plain")
     parser.add_argument("--eval", help="a claims file (.json) to measure accuracy")
+    parser.add_argument("--kinds", nargs="+", help="with --eval: check only claims of these kinds (saves free-tier quota)")
     args = parser.parse_args()
 
     load_dotenv()
@@ -43,7 +44,7 @@ def main():
     print(f"Ready. Live LLM: {model_name(llm)}")
 
     if args.eval:
-        evaluate(args.eval, retriever, facts, llm)
+        evaluate(args.eval, retriever, facts, llm, kinds=args.kinds)
         return
 
     while True:
@@ -81,11 +82,13 @@ def check_waiting_for_limits(claim, retriever, facts, llm):
             time.sleep(RATE_LIMIT_WAIT)
 
 
-def evaluate(path, retriever, facts, llm):
+def evaluate(path, retriever, facts, llm, kinds=None):
     try:
         claims = json.loads(Path(path).read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as error:
         raise PreCueError(f"Could not read the claims file '{path}': {error}") from error
+    if kinds:
+        claims = [item for item in claims if item.get("kind") in kinds]
 
     right = 0
     by_kind = {}  # kind -> [right, total]

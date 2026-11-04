@@ -68,6 +68,20 @@ def same_value(said, document_says, hedged=False):
     return b != 0 and abs(a - b) / abs(b) <= tolerance
 
 
+UP_WORDS = {"rose", "rise", "rises", "risen", "grew", "grow", "grows", "grown", "increased", "increase",
+            "up", "higher", "gained", "climbed", "jumped"}
+DOWN_WORDS = {"fell", "fall", "falls", "fallen", "declined", "decline", "dropped", "drop", "decreased",
+              "decrease", "down", "lower", "shrank", "reduced"}
+
+
+def direction_of(text):
+    """"up" or "down" if the text says a value went up or down, else "" (also when it says both).
+    "Attrition rose to 14.5%" -> "up". "Improved" is left out: an improved attrition went down."""
+    words = set(re.findall(r"[a-z]+", text.lower()))
+    up, down = bool(words & UP_WORDS), bool(words & DOWN_WORDS)
+    return "up" if up and not down else "down" if down and not up else ""
+
+
 def is_hedged(text):
     """True if the speaker said the number loosely: "about 150 crore", "around 1,200"."""
     text = " " + text.lower() + " "
@@ -81,6 +95,9 @@ def words_to_digits(text):
     "one" on its own is left alone: "one more thing" is not a number.
     """
     text = re.sub(r"\bq\s+(one|two|three|four)\b", lambda m: "Q" + str(ONES[m[1].lower()]), text, flags=re.IGNORECASE)
+    # "twenty-four" -> "twenty four" (only between two number words: "one-time" stays)
+    tens = "|".join(TENS)
+    text = re.sub(rf"\b({tens})-({'|'.join(ONES)})\b", r"\1 \2", text, flags=re.IGNORECASE)
     words = text.split(" ")
     out, run = [], []
     for word in words + [""]:  # "" at the end flushes the last run
