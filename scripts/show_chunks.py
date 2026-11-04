@@ -28,13 +28,13 @@ def main():
 
     if with_context:
         from app.contextualizer import add_context
-        from app.llm import get_gemini
+        from app.llm import get_gemini, model_name
 
         load_dotenv()
         llm = get_gemini()
         start = time.time()
-        chunks = add_context(chunks, text, llm, model_name=llm.model)
-        print(f"Context added with {llm.model} in {time.time() - start:.1f}s")
+        chunks = add_context(chunks, text, llm, model_name=model_name(llm))
+        print(f"Context added with {model_name(llm)} in {time.time() - start:.1f}s")
 
     for chunk in chunks:
         info = chunk.metadata

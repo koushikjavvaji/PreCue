@@ -13,11 +13,10 @@ instead of calling the LLM.
 """
 
 from langchain_core.documents import Document
-from langchain_google_genai.chat_models import ChatGoogleGenerativeAIError
 
 from app.cache import cache_file, read_json, write_json
 from app.errors import PreCueError
-from app.llm import gemini_error
+from app.llm import LLM_ERRORS, llm_error
 
 # The document goes first and the chunk last. Every call for the same
 # document then starts with the same text, which lets the provider reuse it.
@@ -64,10 +63,10 @@ def add_context(chunks, document, llm, model_name):
 def _ask_llm(llm, document, chunk):
     try:
         reply = llm.invoke(PROMPT.format(document=document, chunk=chunk))
-    except ChatGoogleGenerativeAIError as error:
-        raise gemini_error(error, "adding context") from error
+    except LLM_ERRORS as error:
+        raise llm_error(error, "adding context") from error
     context = reply.text.strip()
     if not context:
-        raise PreCueError("Gemini returned an empty context.")
+        raise PreCueError("The LLM returned an empty context.")
     return context
 

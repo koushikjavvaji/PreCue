@@ -1,7 +1,8 @@
 """Loads a text document and splits it into section-aware chunks.
 
 How it works:
-  1. Find the document title (the first line).
+  1. Find the document title (the first line, if it looks like a title;
+     otherwise the file name).
   2. Find section headings, for example:
        "# Revenue" or "## Details"       (markdown)
        "2. Revenue" or "2.1 Details"     (numbered)
@@ -88,14 +89,19 @@ def heading_level(line, stands_alone):
     return None
 
 
-def split_into_sections(text):
+def split_into_sections(text, default_title=""):
     """Return (title, sections). Each section is {"path": [...], "text": "..."}."""
     lines = text.split("\n")
 
-    # The first non-empty line is the document title.
+    # The first non-empty line is the title, if it looks like one (short, not a sentence).
+    # Otherwise it is normal text and must stay in the chunks; we use default_title instead.
     first = next(i for i, line in enumerate(lines) if line.strip())
-    title = lines[first].strip().lstrip("#").strip()
-    lines = lines[first + 1 :]
+    if heading_level(lines[first], stands_alone=True) is not None:
+        title = lines[first].strip().lstrip("#").strip()
+        lines = lines[first + 1 :]
+    else:
+        title = default_title
+        lines = lines[first:]
 
     sections = []
     path = []  # current heading path, e.g. ["2. Revenue", "2.1 Details"]
@@ -137,7 +143,7 @@ def make_chunks(text, source):
     ("start" and "end" character positions). Late chunking needs this.
     """
     text = text.replace("\r\n", "\n")
-    title, sections = split_into_sections(text)
+    title, sections = split_into_sections(text, default_title=Path(source).stem)
 
     chunks = []
     cursor = 0  # we search forward, so repeated text is matched in the right place

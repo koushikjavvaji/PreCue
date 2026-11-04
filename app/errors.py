@@ -11,3 +11,7 @@ class STTError(PreCueError):
 
 class MicError(PreCueError):
     """The microphone could not be used."""
+
+
+class ConnectionLostError(STTError):
+    """The network dropped or Deepgram could not be reached. Worth trying again."""

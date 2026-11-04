@@ -23,7 +23,7 @@ from app.embedder import Embedder
 from app.errors import PreCueError
 from app.facts import extract_facts, facts_for
 from app.index import MODES, build_index
-from app.llm import get_gemini
+from app.llm import get_gemini, model_name
 from app.retriever import Retriever
 
 TOP_K = 3
@@ -48,7 +48,7 @@ def main():
     table = []
     if args.facts:
         llm = get_gemini()
-        table = extract_facts(chunks, load_text(args.file), llm, model_name=llm.model)
+        table = extract_facts(chunks, load_text(args.file), llm, model_name=model_name(llm))
         print(f"Facts table: {len(table)} facts")
 
     while True:

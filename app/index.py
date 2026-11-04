@@ -13,7 +13,7 @@ from app.cache import cache_file, read_json, write_json
 from app.chunker import CHUNK_OVERLAP, CHUNK_SIZE, load_text, make_chunks
 from app.contextualizer import add_context
 from app.errors import PreCueError
-from app.llm import get_gemini
+from app.llm import get_gemini, model_name
 
 MODES = ["plain", "contextual", "late"]
 
@@ -28,7 +28,7 @@ def build_index(path, mode, embedder):
     llm_name = ""
     if mode == "contextual":
         llm = get_gemini()
-        llm_name = llm.model
+        llm_name = model_name(llm)
 
     # Everything the index depends on goes into the cache file name.
     settings = [mode, embedder.model_name, llm_name, str(CHUNK_SIZE), str(CHUNK_OVERLAP)]

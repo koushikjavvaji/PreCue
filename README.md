@@ -70,8 +70,15 @@ Early stage. Built so far:
 - **Saved index**: chunks and vectors are cached, so a document is only processed once
 - **Evaluation**: a question set and a script that scores every mode and search method
 - **LangSmith tracing** (optional)
+- **Live fact-checking**: each spoken sentence with a number is checked against the document by a fast LLM (Groq)
+- **Decision engine** (LangGraph): stay silent, alert on a wrong number, or suggest the next point when you pause; never repeats itself
+- **Whispers**: alerts and suggestions spoken into your earphones (Deepgram Aura text-to-speech)
+- **Live screen**: a local web page with the transcript, alerts and suggestions
+- **Built for long meetings**: keeps the connection alive through silence, reconnects after network drops, joins sentences split by a pause
+- **Short phrases end on time**: after 0.8 s of silence PreCue asks Deepgram to finish the sentence, so "99 percent." is not glued to the next sentence
+- **Automated tests**: 55 offline tests (no keys, no microphone) for the decision engine, fact-check safety rules, chunking, speech events, reconnects, the live screen and whispers
 
-Coming next: live fact-checking (Groq + LangGraph), PDF support, text-to-speech whispers.
+Coming next: PDF support, more document formats, security review.
 
 ## Setup
 
@@ -92,6 +99,7 @@ Then open `.env` and add your keys:
 |---|---|---|
 | `DEEPGRAM_API_KEY` | Live speech-to-text | [deepgram.com](https://deepgram.com) (free credit on sign-up) |
 | `GEMINI_API_KEY` | Contextual retrieval and the facts table | [aistudio.google.com](https://aistudio.google.com) (free tier) |
+| `GROQ_API_KEY` | Live fact-checking | [console.groq.com](https://console.groq.com) (free tier) |
 
 Never commit `.env`. It is already in `.gitignore`.
 
@@ -99,11 +107,44 @@ Optional settings in `.env`:
 
 - `GEMINI_MODEL`: the Gemini model to use (default `gemini-3.5-flash-lite`)
 - `GEMINI_REQUESTS_PER_MINUTE`: how fast to call Gemini (default `15`, the free-tier limit). Calls are spaced out automatically.
+- `GROQ_MODEL` (default `openai/gpt-oss-20b`) and `GROQ_REQUESTS_PER_MINUTE` (default `30`)
+- `LIVE_LLM`: `groq` (default) or `gemini`, if you have no Groq key. Gemini is fine for `check_claims`, but too slow for a live meeting: in our test a check took about 20 seconds, so most alerts came too late and were skipped.
+- `WHISPER_DEVICE`: part of your earphones' name, e.g. `AirPods`. List devices with `python -m sounddevice`. Without it, whispers play on the default output.
+- `WHISPER_VOLUME`: from `0` to `1` (default `0.6`)
 - `LANGSMITH_TRACING=true`, `LANGSMITH_API_KEY` and `LANGSMITH_PROJECT`: send traces of every LLM call and search to [LangSmith](https://smith.langchain.com). Off by default. Traces include document text, so use test documents.
 
 ## Usage
 
 Run all commands from the project folder.
+
+**Live copilot (the main app).** Prepares the document, opens the live screen in your browser and starts listening. Use earphones: on laptop speakers the meeting could hear the whispers.
+
+```bash
+python -m scripts.live_copilot samples/sample_report.txt
+python -m scripts.live_copilot samples/sample_report.txt --no-voice    # screen only, no whispers
+```
+
+| You say | PreCue does |
+|---|---|
+| A correct number | Stays silent |
+| A wrong number | Alert on screen + whispers the correct value (once per mistake) |
+| Nothing for 4 seconds after speaking | Suggests the next section you have not covered yet |
+| Small talk | Stays silent (no LLM call) |
+
+**Check claims by typing** (no microphone). Add `--eval` to measure accuracy on a set of right and wrong claims.
+
+```bash
+python -m scripts.check_claims samples/sample_report.txt
+python -m scripts.check_claims samples/sample_report.txt --eval samples/eval_claims.json
+```
+
+On the sample, the checker gets 36-37 of the 37 claims right (correct, wrong and not in the document) with 0 false alerts, on both Groq and Gemini. A check takes 2-3 seconds on Groq. The Groq free tier allows 8,000 tokens per minute (about 4-6 checks) and 1,000 requests per day, so the eval, which sends all 37 claims back to back, slows down to about 10 seconds per claim; a real meeting does not. The last 12 claims were added after tuning, as a fair check. The sample is small, so test with your own documents too.
+
+**Run the tests** (offline, a few seconds):
+
+```bash
+python -m pytest tests
+```
 
 **Live transcription.** Speak and watch the text appear. Press Ctrl+C to stop.
 
@@ -162,15 +203,25 @@ app/
   stt.py            Deepgram live speech-to-text
   mic.py            Microphone input
   chunker.py        Section-aware chunking
-  llm.py            LLM setup (Gemini, rate limit, errors)
+  llm.py            LLM setup (Gemini, Groq, rate limits, errors)
   contextualizer.py Contextual retrieval
   embedder.py       Embeddings (normal and late chunking)
   index.py          Builds and caches a document's chunks and vectors
   retriever.py      Hybrid search (vectors + BM25, merged with RRF)
   facts.py          Facts table
   cache.py          JSON cache in data/cache
+  prepare.py        Everything done with a document before the meeting
+  fact_checker.py   Checks one spoken claim against the document
+  copilot.py        Decision engine (LangGraph): silent, alert or suggest
+  voice.py          Whispers (text-to-speech to your earphones)
+  screen.py         Live screen (local web server)
   errors.py         PreCue's error types
+web/
+  index.html        The live screen page
+tests/              Offline tests (fake LLM, search and Deepgram)
 scripts/
+  live_copilot.py   The main app
+  check_claims.py
   live_transcribe.py
   show_chunks.py
   search.py
@@ -178,6 +229,7 @@ scripts/
 samples/
   sample_report.txt
   eval_questions.json
+  eval_claims.json
 ```
 
 ## License

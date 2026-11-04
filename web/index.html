@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PreCue Live</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --panel: #ffffff; --text: #1d2330; --muted: #6b7280; --line: #e3e6eb;
+    --alert: #c62828; --alert-bg: #fdecec; --suggest: #1d5fbf; --suggest-bg: #e8f0fc;
+    --ok: #2e7d32; --warn: #b26a00;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #12151b; --panel: #1b1f27; --text: #e7e9ee; --muted: #9aa1ad; --line: #2a303b;
+      --alert: #ff6b6b; --alert-bg: #3a1d20; --suggest: #7fb0ff; --suggest-bg: #1b2a42;
+      --ok: #6fcf75; --warn: #f0b350;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  header { display: flex; align-items: center; gap: 12px; padding: 12px 16px;
+           border-bottom: 1px solid var(--line); background: var(--panel); }
+  header h1 { font-size: 18px; margin: 0; }
+  #status { margin-left: auto; font-size: 14px; color: var(--muted); }
+  #status::before { content: "●"; margin-right: 6px; }
+  #status.listening::before { color: var(--ok); }
+  #status.reconnecting::before, #status.offline::before { color: var(--warn); }
+  main { display: grid; grid-template-columns: 3fr 2fr; gap: 16px; padding: 0 16px 16px;
+         height: calc(100vh - 80px); }
+  section { background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+            padding: 12px 16px; overflow-y: auto; min-height: 0; }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 0 0 8px; }
+  #transcript p { margin: 0 0 6px; }
+  #partial { color: var(--muted); font-style: italic; }
+  .card { border-radius: 8px; padding: 10px 12px; margin-bottom: 10px; border-left: 4px solid; }
+  .card.alert { background: var(--alert-bg); border-color: var(--alert); }
+  .card.suggest { background: var(--suggest-bg); border-color: var(--suggest); }
+  #note { padding: 4px 16px; font-size: 13px; color: var(--muted); min-height: 1.5em; }
+  .card .kind { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
+  .card.alert .kind { color: var(--alert); }
+  .card.suggest .kind { color: var(--suggest); }
+  .card .time { float: right; font-size: 12px; color: var(--muted); }
+  .empty { color: var(--muted); font-size: 14px; }
+  @media (max-width: 760px) {
+    main { grid-template-columns: 1fr; height: auto; }
+    section { max-height: 60vh; }
+    #alerts { order: -1; }  /* small window: alerts first, they matter most */
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>PreCue</h1>
+  <span id="status" class="offline">Connecting...</span>
+</header>
+<div id="note"></div>
+<main>
+  <section>
+    <h2>Live transcript</h2>
+    <div id="transcript"><p class="empty" id="waiting">Waiting for speech...</p></div>
+    <p id="partial"></p>
+  </section>
+  <section id="alerts">
+    <h2>Alerts and suggestions</h2>
+    <div id="cards"><p class="empty" id="no-cards">Nothing yet. PreCue stays quiet while you are right.</p></div>
+  </section>
+</main>
+<script>
+  const transcript = document.getElementById("transcript");
+  const partial = document.getElementById("partial");
+  const cards = document.getElementById("cards");
+  const status = document.getElementById("status");
+  const note = document.getElementById("note");
+  const LABELS = { alert: "Check this", suggest: "Next point" };
+
+  function removeEl(id) { const el = document.getElementById(id); if (el) el.remove(); }
+
+  function addSentence(text) {
+    removeEl("waiting");
+    const p = document.createElement("p");
+    p.textContent = text;  // textContent, never innerHTML: speech text is never run as code
+    transcript.appendChild(p);
+    partial.textContent = "";
+    transcript.parentElement.scrollTop = transcript.parentElement.scrollHeight;
+  }
+
+  function addCard(event) {
+    removeEl("no-cards");
+    const card = document.createElement("div");
+    card.className = "card " + event.type;
+    const kind = document.createElement("div");
+    kind.className = "kind";
+    kind.textContent = LABELS[event.type];
+    const time = document.createElement("span");
+    time.className = "time";
+    time.textContent = event.time || "";
+    kind.appendChild(time);
+    const text = document.createElement("div");
+    text.textContent = event.text;
+    card.append(kind, text);
+    cards.prepend(card);  // newest on top
+  }
+
+  function setStatus(text, state) {
+    status.textContent = text;
+    status.className = state;
+  }
+
+  const source = new EventSource("/events");
+  source.onopen = () => setStatus("Connected", "listening");
+  source.onerror = () => setStatus("PreCue is not running", "offline");  // the browser retries by itself
+  source.onmessage = (message) => {
+    const event = JSON.parse(message.data);
+    if (event.type === "final") addSentence(event.text);
+    else if (event.type === "partial") partial.textContent = event.text;
+    else if (event.type === "status") setStatus(event.text, event.state);
+    else if (event.type in LABELS) addCard(event);
+    else if (event.type === "skipped") note.textContent = event.time + "  " + event.text;  // minor: no card
+  };
+</script>
+</body>
+</html>
