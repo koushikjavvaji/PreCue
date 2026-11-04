@@ -36,17 +36,22 @@ only on `127.0.0.1` (this computer).
   - what PreCue whispers is built from those checked values only
     ("₹10 crore, not 100 crore."), never from free LLM text
   - text shown on screen is cut to a short length
-- **Screen sharing**: on macOS the alert overlay is hidden from screenshots and screen
-  capture, so meeting participants do not see it. Test it once with a real share before
+- **Screen sharing**: on macOS and Windows (10 version 2004 or newer) the alert overlay is
+  hidden from screenshots and screen capture, so meeting participants do not see it.
+  On Linux it is not hidden, so it is off unless you ask for it (`--overlay`). Test it once with a real share before
   an important meeting.
 - **A stuck page**: each open page has a limited queue, so a tab that stops reading
   cannot fill the memory.
+- **Huge or booby-trapped files**: files over 100 MB, PDFs over 1,000 pages, Word and
+  PowerPoint files that unpack to over 500 MB (a "zip bomb") and documents with over
+  5 million characters are refused before they can freeze the computer or use up the free tier.
 
 ## What you should know
 
-- **Local cache**: `data/cache` keeps your document's chunks, vectors and facts as plain
-  JSON, so a document is processed only once. Delete the folder when you are done with
-  a sensitive document.
+- **Local cache**: `data/cache` keeps your document's text, chunks, vectors and facts as
+  plain JSON, so a document is processed only once. The files can be read only by your
+  user account (on macOS and Linux). Delete the folder when you are done with a
+  sensitive document.
 - **Other programs on your computer** can open `http://127.0.0.1:8765` and read the live
   transcript while PreCue runs. That is normal for local tools; do not run PreCue on a
   shared account.

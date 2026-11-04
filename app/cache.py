@@ -32,5 +32,9 @@ def read_json(path):
 
 
 def write_json(path, data):
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    """Save data. The cache holds your documents' text, so only your user account may read it."""
+    path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    temporary = path.with_name(path.name + ".tmp")
+    temporary.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    temporary.chmod(0o600)
+    temporary.replace(path)  # all at once: a crash mid-write never leaves a half-written file

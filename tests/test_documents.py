@@ -5,6 +5,8 @@ made to have a known problem real documents have (two columns, page footers, wra
 headings, scanned pages...).
 """
 
+import sys
+
 import pytest
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle
@@ -246,3 +248,46 @@ def test_is_page_number(text, expected):
 
 def test_join_lines_rejoins_hyphenated_words():
     assert _join_lines(["the transac-", "tion rate was", "Tier-", "2 cities"]) == "the transaction rate was Tier- 2 cities"
+
+
+def test_too_big_files_are_refused(tmp_path, monkeypatch):
+    import app.documents as documents
+
+    big = tmp_path / "big.txt"
+    big.write_text("x" * 2048)
+    monkeypatch.setattr(documents, "MAX_FILE_MB", 0.001)
+    with pytest.raises(PreCueError, match="limit"):
+        documents.read_document(big)
+
+
+def test_zip_bomb_is_refused(tmp_path, monkeypatch):
+    import zipfile
+
+    import app.documents as documents
+
+    bomb = tmp_path / "bomb.docx"
+    with zipfile.ZipFile(bomb, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr("word/document.xml", "0" * 5_000_000)  # 5 MB that zips to a few KB
+    assert bomb.stat().st_size < 50_000
+    monkeypatch.setattr(documents, "MAX_UNZIPPED_MB", 1)
+    with pytest.raises(PreCueError, match="unpacks to"):
+        documents.read_document(bomb)
+
+
+def test_too_much_text_is_refused(tmp_path, monkeypatch):
+    import app.documents as documents
+
+    long = tmp_path / "long.md"
+    long.write_text("# T\n\n" + "word " * 1000)
+    monkeypatch.setattr(documents, "MAX_TEXT_CHARACTERS", 100)
+    with pytest.raises(PreCueError, match="too much text"):
+        documents.read_document(long)
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="Windows has no Unix file permissions")
+def test_cache_files_are_private(tmp_path):
+    path = tmp_path / "cache" / "text_x.json"
+    cache.write_json(path, {"text": "secret plans"})
+    assert cache.read_json(path) == {"text": "secret plans"}
+    assert path.stat().st_mode & 0o077 == 0  # no one else can read it
+    assert not list(path.parent.glob("*.tmp"))

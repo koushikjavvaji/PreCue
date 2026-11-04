@@ -19,6 +19,7 @@ All three libraries (pdfplumber, python-docx, python-pptx) are MIT-licensed.
 
 import hashlib
 import re
+import zipfile
 from collections import Counter
 from pathlib import Path
 
@@ -29,6 +30,12 @@ SUPPORTED_FILES = {".txt", ".md", ".pdf", ".docx", ".pptx"}
 MAX_HEADING_LENGTH = 80  # characters; a longer line is a sentence, not a heading
 HEADING_SIZE_RATIO = 1.15  # a line this much bigger than normal text is a heading
 EDGE = 0.08  # the top and bottom 8% of a page: where headers, footers and page numbers live
+# Limits, so a huge or booby-trapped file cannot freeze the computer or use up the free tier.
+# (Each chunk costs one LLM call for the facts table; 1,000 pages is already a very big report.)
+MAX_FILE_MB = 100
+MAX_UNZIPPED_MB = 500  # .docx and .pptx are zip files; a "zip bomb" is tiny but unpacks to gigabytes
+MAX_PDF_PAGES = 1000
+MAX_TEXT_CHARACTERS = 5_000_000  # about 2,000 pages of text
 WORD_GAP = 1.5  # points; a smaller gap between letters is inside a word. (pdfplumber's default, 3,
                 # glues the words of tightly printed PDFs together: "Thedominantsequence...")
 
@@ -41,6 +48,7 @@ def read_document(path):
         names = ", ".join(sorted(SUPPORTED_FILES))
         raise PreCueError(f"'{path.name}' is not supported. Use one of: {names}.")
     try:
+        _check_size(path, kind)
         if kind in (".txt", ".md"):
             text = path.read_text(encoding="utf-8")
         else:
@@ -53,7 +61,21 @@ def read_document(path):
     text = text.replace("\r\n", "\n")  # Windows line endings -> normal
     if not text.strip():
         raise PreCueError(f"'{path.name}' is empty.")
+    if len(text) > MAX_TEXT_CHARACTERS:
+        raise PreCueError(f"'{path.name}' has too much text (over {MAX_TEXT_CHARACTERS:,} characters). Split it into smaller files.")
     return text
+
+
+def _check_size(path, kind):
+    """Refuse files that are too big before reading them (see the limits at the top)."""
+    megabytes = path.stat().st_size / 1024 / 1024
+    if megabytes > MAX_FILE_MB:
+        raise PreCueError(f"'{path.name}' is {megabytes:.0f} MB; the limit is {MAX_FILE_MB} MB.")
+    if kind in (".docx", ".pptx"):
+        with zipfile.ZipFile(path) as archive:
+            unzipped = sum(item.file_size for item in archive.infolist()) / 1024 / 1024
+        if unzipped > MAX_UNZIPPED_MB:
+            raise PreCueError(f"'{path.name}' unpacks to {unzipped:.0f} MB; the limit is {MAX_UNZIPPED_MB} MB.")
 
 
 def _read_cached(path, kind):
@@ -83,6 +105,8 @@ def pdf_to_text(path):
     import pdfplumber
 
     with pdfplumber.open(path) as pdf:
+        if len(pdf.pages) > MAX_PDF_PAGES:
+            raise PreCueError(f"'{path.name}' has {len(pdf.pages)} pages; the limit is {MAX_PDF_PAGES}.")
         pages = [_read_page(page) for page in pdf.pages]
         title = (pdf.metadata or {}).get("Title", "")
 
