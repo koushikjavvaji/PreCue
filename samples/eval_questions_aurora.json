@@ -1,0 +1,222 @@
+[
+ {
+  "question": "How much revenue did we make this quarter?",
+  "sections": [
+   "1. Executive Summary",
+   "2. Financial Performance"
+  ]
+ },
+ {
+  "question": "What was the EBITDA margin?",
+  "sections": [
+   "2. Financial Performance",
+   "1. Executive Summary"
+  ]
+ },
+ {
+  "question": "How much cash do we have?",
+  "sections": [
+   "2. Financial Performance"
+  ]
+ },
+ {
+  "question": "Which sales channel is the largest?",
+  "sections": [
+   "3. Revenue by Channel"
+  ]
+ },
+ {
+  "question": "How fast are online sales growing?",
+  "sections": [
+   "3. Revenue by Channel"
+  ]
+ },
+ {
+  "question": "Which countries do we export to?",
+  "sections": [
+   "3. Revenue by Channel"
+  ]
+ },
+ {
+  "question": "Which region sells the most?",
+  "sections": [
+   "4. Regional Performance"
+  ]
+ },
+ {
+  "question": "How is the East region doing?",
+  "sections": [
+   "4. Regional Performance"
+  ]
+ },
+ {
+  "question": "How many SKUs do we sell?",
+  "sections": [
+   "5. Products"
+  ]
+ },
+ {
+  "question": "What is our best-selling product?",
+  "sections": [
+   "5. Products"
+  ]
+ },
+ {
+  "question": "How many shops stock our products?",
+  "sections": [
+   "6. Customers and Distribution",
+   "1. Executive Summary"
+  ]
+ },
+ {
+  "question": "How often do online customers buy again?",
+  "sections": [
+   "6. Customers and Distribution"
+  ]
+ },
+ {
+  "question": "Are customer complaints going down?",
+  "sections": [
+   "6. Customers and Distribution"
+  ]
+ },
+ {
+  "question": "How busy are the factories?",
+  "sections": [
+   "7. Operations and Supply Chain"
+  ]
+ },
+ {
+  "question": "How much product do we waste?",
+  "sections": [
+   "7. Operations and Supply Chain"
+  ]
+ },
+ {
+  "question": "What did the Mysuru plant upgrade cost?",
+  "sections": [
+   "7. Operations and Supply Chain"
+  ]
+ },
+ {
+  "question": "How many employees do we have?",
+  "sections": [
+   "8. People"
+  ]
+ },
+ {
+  "question": "How many people leave the company each year?",
+  "sections": [
+   "8. People"
+  ]
+ },
+ {
+  "question": "How many managers are women?",
+  "sections": [
+   "8. People"
+  ]
+ },
+ {
+  "question": "How much did we spend on advertising?",
+  "sections": [
+   "9. Marketing"
+  ]
+ },
+ {
+  "question": "Did the cricket campaign work?",
+  "sections": [
+   "9. Marketing"
+  ]
+ },
+ {
+  "question": "How green are our plants?",
+  "sections": [
+   "10. Sustainability"
+  ]
+ },
+ {
+  "question": "How much plastic did we recycle?",
+  "sections": [
+   "10. Sustainability"
+  ]
+ },
+ {
+  "question": "What could hurt our margins?",
+  "sections": [
+   "11. Risks"
+  ]
+ },
+ {
+  "question": "What is the tax risk?",
+  "sections": [
+   "11. Risks"
+  ]
+ },
+ {
+  "question": "Are competitors cutting prices?",
+  "sections": [
+   "11. Risks"
+  ]
+ },
+ {
+  "question": "What is the revenue target for next quarter?",
+  "sections": [
+   "12. Outlook and Targets"
+  ]
+ },
+ {
+  "question": "When will the new factory open?",
+  "sections": [
+   "12. Outlook and Targets"
+  ]
+ },
+ {
+  "question": "1.85 lakh",
+  "sections": [
+   "6. Customers and Distribution",
+   "1. Executive Summary"
+  ]
+ },
+ {
+  "question": "₹54.3 crore",
+  "sections": [
+   "2. Financial Performance"
+  ]
+ },
+ {
+  "question": "94.2%",
+  "sections": [
+   "7. Operations and Supply Chain"
+  ]
+ },
+ {
+  "question": "We hired 96 people this quarter.",
+  "sections": [
+   "8. People"
+  ]
+ },
+ {
+  "question": "Beverages grew 9 percent.",
+  "sections": [
+   "5. Products"
+  ]
+ },
+ {
+  "question": "We will reach 2.2 lakh outlets by March.",
+  "sections": [
+   "12. Outlook and Targets"
+  ]
+ },
+ {
+  "question": "Exports grew 18 percent.",
+  "sections": [
+   "3. Revenue by Channel"
+  ]
+ },
+ {
+  "question": "Women make up 37 percent of the workforce.",
+  "sections": [
+   "8. People"
+  ]
+ }
+]
