@@ -24,12 +24,12 @@ from pathlib import Path
 from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
+from app.documents import read_document
 from app.errors import PreCueError
 
 CHUNK_SIZE = 800  # max characters of section text per chunk (about 130-150 words)
 CHUNK_OVERLAP = 100  # characters shared between chunks when a big section is split
 MAX_HEADING_LENGTH = 80
-SUPPORTED_FILES = {".txt", ".md"}
 
 NUMBERED_HEADING = re.compile(r"^(\d+(?:\.\d+)*)[.)]?\s+\S")  # "2. Revenue", "2.1 Details"
 
@@ -41,20 +41,11 @@ splitter = RecursiveCharacterTextSplitter(
 
 
 def load_text(path):
-    """Read a .txt or .md file and return its text."""
-    path = Path(path)
-    if path.suffix.lower() not in SUPPORTED_FILES:
-        raise PreCueError(f"'{path.name}' is not supported. Use a .txt or .md file.")
-    try:
-        text = path.read_text(encoding="utf-8")
-    except (OSError, UnicodeDecodeError) as error:
-        raise PreCueError(f"Could not read '{path}': {error}") from error
-    if not text.strip():
-        raise PreCueError(f"'{path.name}' is empty.")
-    return text.replace("\r\n", "\n")  # Windows line endings -> normal
+    """Read a document (.txt, .md, .pdf, .docx or .pptx) and return its text (see documents.py)."""
+    return read_document(path)
 
 
-def heading_level(line, stands_alone):
+def heading_level(line, stands_alone, markdown_only=False):
     """Return the heading level (1 = top) if the line is a heading, otherwise None.
 
     stands_alone = the line has a blank line (or the start/end of the text)
@@ -66,6 +57,11 @@ def heading_level(line, stands_alone):
     if line.startswith("#"):
         hashes = len(line) - len(line.lstrip("#"))
         return hashes if line[hashes:].strip() else None
+
+    # A document with markdown headings (every PDF, Word and PowerPoint file, see documents.py)
+    # already says where its headings are. Guessing more would turn author names or figure labels into sections.
+    if markdown_only:
+        return None
 
     # Other headings must stand alone, be short, and not end like a sentence.
     if not stands_alone or len(line) > MAX_HEADING_LENGTH:
@@ -103,6 +99,7 @@ def split_into_sections(text, default_title=""):
         title = default_title
         lines = lines[first:]
 
+    markdown_only = sum(re.match(r"#{2,} ", line) is not None for line in lines) >= 2  # "## ...", "### ..."
     sections = []
     path = []  # current heading path, e.g. ["2. Revenue", "2.1 Details"]
     levels = []  # the level of each heading in path, e.g. [1, 2]
@@ -116,7 +113,7 @@ def split_into_sections(text, default_title=""):
     for i, line in enumerate(lines):
         blank_above = i == 0 or not lines[i - 1].strip()
         blank_below = i == len(lines) - 1 or not lines[i + 1].strip()
-        level = heading_level(line, blank_above and blank_below) if line.strip() else None
+        level = heading_level(line, blank_above and blank_below, markdown_only) if line.strip() else None
 
         if level is None:
             body.append(line)

@@ -167,11 +167,13 @@ class Copilot:
         if key in state["alerted"]:
             return {}  # we already told them about this mistake
 
-        said, real = verdict["said"], verdict["document_says"]
+        # Built only from short, checked values, never from free LLM text: a booby-trapped
+        # document must not be able to make PreCue say anything else in your ear.
+        said, real = short(spoken_value(verdict["said"])), short(verdict["document_says"])
         return {
             "action": "alert",
-            "message": f"You said {said}, the document says {real} ({section_name(verdict['section'])}).",
-            "spoken": verdict["correction"] or f"It's {real}, not {said}.",
+            "message": f"You said {said}, the document says {real} ({short(section_name(verdict['section']))}).",
+            "spoken": f"{real}, not {said}.",
             "alerted": state["alerted"] + [key],
         }
 
@@ -217,6 +219,24 @@ class Copilot:
             if chunk.metadata["chunk"] not in state["covered"]:
                 return chunk
         return None
+
+
+# A number with its unit: "1 crore", "₹10 crore", "97.4%", "52,000", "3.2 percent".
+VALUE = re.compile(r"[₹$]?\s?\d[\d,]*(?:\.\d+)?\s*(?:%|percent|crores?|lakhs?|thousand|million|billion)?", re.IGNORECASE)
+
+
+def spoken_value(said):
+    """What the speaker said, as a value. The LLM sometimes gives the whole sentence instead:
+    "The compliance update will cost us about 1 crore." -> "1 crore"."""
+    if len(said.split()) <= 6:
+        return said
+    match = VALUE.search(said)
+    return match.group().strip() if match else said
+
+
+def short(text, limit=60):
+    """Cut LLM text that is much longer than a value or a section name should be."""
+    return text if len(text) <= limit else text[: limit - 1] + "…"
 
 
 def section_name(section):

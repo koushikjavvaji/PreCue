@@ -23,6 +23,7 @@ from app.llm import LLM_ERRORS, llm_error, structured
 
 
 CLOSEST_FACTS = 5  # facts found by meaning, on top of the facts of the top chunks
+MAX_VALUE_WORDS = 6  # a real value is short ("1,850 transactions per second"); a sentence is not a value
 
 
 class Verdict(BaseModel):
@@ -33,9 +34,6 @@ class Verdict(BaseModel):
         "Empty if the document does not give it"
     )
     section: str = Field(description="The document section with that value. Empty if not found")
-    correction: str = Field(
-        description="Only if wrong: one short sentence the speaker can say instead. Otherwise empty"
-    )
 
 
 PROMPT = """You check what a speaker says in a meeting against their own document.
@@ -92,6 +90,11 @@ def check_claim(claim, results, facts, llm):
 
 
 def _is_trustworthy(document_says, evidence):
-    """A "wrong" verdict needs a real number from the document to correct the speaker with."""
+    """A "wrong" verdict needs a real number from the document to correct the speaker with.
+
+    It must also be short: a long "value" means the LLM wrote a sentence, maybe one that a
+    booby-trapped document asked for, and that must never be whispered to the speaker.
+    """
     has_number = re.search(r"\d", document_says) is not None
-    return has_number and is_grounded(document_says, evidence)
+    is_short = len(document_says.split()) <= MAX_VALUE_WORDS
+    return has_number and is_short and is_grounded(document_says, evidence)

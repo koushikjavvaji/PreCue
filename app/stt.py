@@ -37,7 +37,7 @@ class DeepgramSTT:
         self.api_key = api_key
         self.model = model
 
-    def listen(self, audio_queue, keywords=()):
+    def listen(self, audio_queue):
         """Send audio to Deepgram and give back events one by one.
 
         Each event is a dict:
@@ -49,7 +49,7 @@ class DeepgramSTT:
         Raises ConnectionLostError if the network fails (worth retrying),
         or STTError for other problems (like a wrong API key).
         """
-        connection = self._connect(keywords)
+        connection = self._connect()
 
         # One thread sends audio, while this one receives the text.
         sender = threading.Thread(
@@ -67,11 +67,11 @@ class DeepgramSTT:
         finally:
             connection.close()
 
-    def _connect(self, keywords):
+    def _connect(self):
         """Open the live connection. Turn common failures into clear messages."""
         try:
             return connect(
-                self._make_url(keywords),
+                self._make_url(),
                 additional_headers={"Authorization": f"Token {self.api_key}"},
                 ssl=SSL_CONTEXT,
             )
@@ -87,7 +87,7 @@ class DeepgramSTT:
                 f"Could not reach Deepgram: {error}. Check your internet connection."
             ) from error
 
-    def _make_url(self, keywords):
+    def _make_url(self):
         options = [
             ("model", self.model),
             ("encoding", "linear16"),
@@ -99,8 +99,6 @@ class DeepgramSTT:
             ("utterance_end_ms", 1000),  # tell us after 1 second of silence
             ("endpointing", 300),  # a sentence ends after 300 ms of silence (not at every tiny breath)
         ]
-        for word in keywords:  # boost words from the user's documents
-            options.append(("keyterm", word))
         return f"{DEEPGRAM_URL}?{urlencode(options)}"
 
     def _send_audio(self, connection, audio_queue):

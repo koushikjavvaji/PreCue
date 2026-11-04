@@ -13,5 +13,9 @@ class MicError(PreCueError):
     """The microphone could not be used."""
 
 
+class RateLimitError(PreCueError):
+    """An LLM's free-tier limit was reached. Waiting (a minute, or a day) helps."""
+
+
 class ConnectionLostError(STTError):
     """The network dropped or Deepgram could not be reached. Worth trying again."""

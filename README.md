@@ -62,7 +62,8 @@ Before the meeting, you upload documents (PDFs, reports, presentations). They ar
 Early stage. Built so far:
 
 - **Live speech-to-text** with Deepgram (partial and final text, speech start and pause events)
-- **Section-aware chunking** of `.txt` and `.md` documents
+- **Documents**: `.pdf`, `.docx` (Word), `.pptx` (PowerPoint), `.txt` and `.md`. PDFs keep their headings (found by font), tables, and reading order on two-column pages; page headers, footers and page numbers are removed. Scanned PDFs (pictures of pages) are not supported yet
+- **Section-aware chunking**
 - **Contextual retrieval** (an LLM writes a short context for each chunk) using Gemini
 - **Embeddings** with a local model, in three modes: `plain`, `contextual` and `late` (late chunking, also for long documents)
 - **Hybrid search**: vector search plus BM25 keyword search for questions with numbers, merged with Reciprocal Rank Fusion
@@ -74,12 +75,13 @@ Early stage. Built so far:
 - **Decision engine** (LangGraph): stay silent, alert on a wrong number, or suggest the next point when you pause; never repeats itself
 - **Whispers**: alerts and suggestions spoken into your earphones (Deepgram Aura text-to-speech)
 - **Live screen**: a local web page with the transcript, alerts and suggestions
-- **Meeting overlay** (macOS): alerts pop up in a small floating window on top of every app, also full-screen Zoom and slideshows. It is click-through, never takes the focus, fades after a few seconds and is **hidden from screen sharing**: the people in the meeting never see it
+- **Meeting overlay** (macOS and Windows): alerts pop up in a small floating window on top of every app, also full-screen Zoom and slideshows. It is click-through, never takes the focus, fades after a few seconds and is **hidden from screen sharing**: the people in the meeting never see it. Linux cannot hide a window from screen sharing, so there PreCue opens a browser tab unless you add `--overlay`
+- **Security**: see [SECURITY.md](SECURITY.md) for where your data goes and what PreCue protects against
 - **Built for long meetings**: keeps the connection alive through silence, reconnects after network drops, joins sentences split by a pause
 - **Short phrases end on time**: after 0.8 s of silence PreCue asks Deepgram to finish the sentence, so "99 percent." is not glued to the next sentence
 - **Automated tests**: 65 offline tests (no keys, no microphone), plus 13 real-window overlay tests, for the decision engine, fact-check safety rules, chunking, speech events, reconnects, the live screen, whispers and the overlay
 
-Coming next: PDF support, more document formats, security review.
+Coming next: scanned PDFs (OCR), charts and images inside documents.
 
 ## Setup
 
@@ -124,6 +126,7 @@ Run all commands from the project folder.
 python -m scripts.live_copilot samples/sample_report.txt
 python -m scripts.live_copilot samples/sample_report.txt --no-voice    # pop-ups only, no whispers
 python -m scripts.live_copilot samples/sample_report.txt --no-overlay  # browser tab instead of pop-ups
+python -m scripts.live_copilot my_report.pdf                           # any .pdf, .docx, .pptx, .txt or .md
 ```
 
 | You say | PreCue does |
@@ -203,7 +206,7 @@ The sample has only 9 chunks, so treat these numbers as a smoke test, not a benc
 ## Notes
 
 - Free API tiers may use your data to improve their models. Test with public or sample documents, not confidential ones.
-- `samples/sample_report.txt` is a fictional document made for testing.
+- `samples/sample_report.txt` is a fictional document made for testing. The `.pdf`, `.docx` and `.pptx` versions are made from it by `python -m scripts.make_sample_documents`.
 - Generated files (test documents, the cache) go in `data/`, which is not committed. Delete `data/cache` to rebuild everything.
 
 ## Project layout
@@ -212,6 +215,7 @@ The sample has only 9 chunks, so treat these numbers as a smoke test, not a benc
 app/
   stt.py            Deepgram live speech-to-text
   mic.py            Microphone input
+  documents.py      Reads .pdf, .docx, .pptx, .txt and .md files
   chunker.py        Section-aware chunking
   llm.py            LLM setup (Gemini, Groq, rate limits, errors)
   contextualizer.py Contextual retrieval
@@ -225,7 +229,8 @@ app/
   copilot.py        Decision engine (LangGraph): silent, alert or suggest
   voice.py          Whispers (text-to-speech to your earphones)
   screen.py         Live screen (local web server)
-  overlay.py        Meeting overlay: floating pop-up window, hidden from screen sharing (macOS)
+  overlay.py        Meeting overlay on macOS: floating pop-up window, hidden from screen sharing
+  overlay_tk.py     Meeting overlay on Windows and Linux
   errors.py         PreCue's error types
 web/
   index.html        The live screen page
@@ -238,12 +243,13 @@ scripts/
   show_chunks.py
   search.py
   evaluate.py
+  make_sample_documents.py
 samples/
-  sample_report.txt
+  sample_report.txt (.pdf, .docx, .pptx)
   eval_questions.json
   eval_claims.json
 ```
 
 ## License
 
-TBD
+[MIT](LICENSE)

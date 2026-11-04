@@ -282,6 +282,31 @@ def test_screen_serves_page_streams_events_and_replays_history():
     assert wait_for(lambda: not screen.clients)
 
 
+def test_screen_refuses_other_host_names():
+    """DNS rebinding: a website that points its own name at 127.0.0.1 must not read the transcript."""
+    screen = LiveScreen(port=free_port())
+    port = screen.server.server_address[1]
+    for path in ["/", "/events", "/overlay"]:
+        request = urllib.request.Request(screen.url + path, headers={"Host": f"evil.example:{port}"})
+        with pytest.raises(urllib.error.HTTPError) as error:
+            urllib.request.urlopen(request, timeout=3)
+        assert error.value.code == 403
+    for host in [f"127.0.0.1:{port}", f"localhost:{port}"]:
+        request = urllib.request.Request(screen.url + "/", headers={"Host": host})
+        assert urllib.request.urlopen(request, timeout=3).status == 200
+
+
+def test_slow_page_cannot_fill_the_memory():
+    import app.screen as screen_module
+
+    screen = LiveScreen(port=free_port())
+    stalled = queue.Queue(maxsize=screen_module.MAX_WAITING)
+    screen.clients.append(stalled)  # a page that never reads
+    for i in range(screen_module.MAX_WAITING + 100):
+        screen.send({"type": "final", "text": str(i)})
+    assert stalled.qsize() == screen_module.MAX_WAITING
+
+
 def test_screen_port_in_use_gives_clear_error():
     port = free_port()
     LiveScreen(port=port)

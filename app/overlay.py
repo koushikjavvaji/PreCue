@@ -1,4 +1,7 @@
-"""The overlay: a small floating window for alerts, on top of the meeting (macOS).
+"""The overlay: a small floating window for alerts, on top of the meeting.
+
+This file is the macOS overlay. Windows and Linux use overlay_tk.py instead;
+start_overlay() and main() pick the right one.
 
 During a meeting you look at Zoom, Meet or your slides, not at a browser tab.
 So alerts and suggestions pop up in a small window in the top-right corner:
@@ -47,6 +50,15 @@ def stop_overlay(process):
 
 
 def main():
+    if sys.platform == "darwin" and "--tk" not in sys.argv:  # --tk: try the Windows/Linux overlay on a Mac
+        mac_overlay()
+    else:
+        from app.overlay_tk import main as tk_main
+
+        tk_main()
+
+
+def mac_overlay():
     # Imported here: only the overlay process needs the macOS window libraries.
     from AppKit import (
         NSApplication,

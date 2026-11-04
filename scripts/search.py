@@ -31,7 +31,7 @@ TOP_K = 3
 
 def main():
     parser = argparse.ArgumentParser(description="Search a document with PreCue.")
-    parser.add_argument("file", help="a .txt or .md file")
+    parser.add_argument("file", help="a .txt, .md, .pdf, .docx or .pptx file")
     parser.add_argument("--mode", choices=MODES, default="plain")
     parser.add_argument("--facts", action="store_true", help="show the facts table rows of each result")
     args = parser.parse_args()

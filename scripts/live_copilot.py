@@ -6,8 +6,9 @@ Run from the project folder:
   python -m scripts.live_copilot samples/sample_report.txt --no-screen    (terminal + whispers)
   python -m scripts.live_copilot samples/sample_report.txt --no-overlay   (browser tab instead of pop-ups)
 
-Alerts pop up in a small floating window on top of your meeting (overlay.py),
-hidden from screen sharing. The full page with the transcript is at the
+Alerts pop up in a small floating window on top of your meeting (overlay.py on macOS,
+overlay_tk.py on Windows), hidden from screen sharing. On Linux the pop-up cannot be hidden
+from screen sharing, so it opens a browser tab unless you add --overlay. The full page with the transcript is at the
 printed "Live screen" address.
 
 What runs at the same time (threads):
@@ -152,17 +153,32 @@ def listen(stt, audio_queue, meeting):
             audio_queue.get_nowait()
 
 
+def use_overlay(args):
+    """The pop-up window on macOS and Windows. On Linux only when asked for:
+    Linux cannot hide a window from screen sharing, so the meeting could see it."""
+    if args.no_overlay:
+        return False
+    if sys.platform.startswith("linux"):
+        if args.overlay:
+            print("WARNING: on Linux the pop-up is visible if you share your whole screen. "
+                  "Share one window (e.g. your slides) instead.")
+        return args.overlay
+    return True
+
+
 def now():
     return time.strftime("%H:%M:%S")
 
 
 def main():
     parser = argparse.ArgumentParser(description="PreCue live meeting copilot.")
-    parser.add_argument("file", help="the document for this meeting (.txt or .md)")
+    parser.add_argument("file", help="the document for this meeting (.txt, .md, .pdf, .docx or .pptx)")
     parser.add_argument("--mode", choices=MODES, default="plain")
     parser.add_argument("--no-voice", action="store_true", help="no whispers, screen only")
     parser.add_argument("--no-screen", action="store_true", help="no web page and no pop-ups")
     parser.add_argument("--no-overlay", action="store_true", help="open a browser tab instead of the pop-up window")
+    parser.add_argument("--overlay", action="store_true",
+                        help="Linux: use the pop-up window (it is visible if you share your whole screen)")
     args = parser.parse_args()
 
     load_dotenv()
@@ -181,10 +197,10 @@ def main():
     if not args.no_screen:
         screen = LiveScreen()
         print(f"Live screen: {screen.url}")
-        if args.no_overlay or sys.platform != "darwin":  # the overlay is macOS only for now
-            webbrowser.open(screen.url)
-        else:
+        if use_overlay(args):
             overlay = start_overlay(screen.url)
+        else:
+            webbrowser.open(screen.url)
 
     whisperer = None
     if not args.no_voice:

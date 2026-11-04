@@ -17,7 +17,7 @@ from langchain_google_genai.chat_models import ChatGoogleGenerativeAIError
 from langchain_groq import ChatGroq
 from pydantic import ValidationError
 
-from app.errors import PreCueError
+from app.errors import PreCueError, RateLimitError
 
 DEFAULT_GEMINI_MODEL = "gemini-3.5-flash-lite"  # change with GEMINI_MODEL in .env
 DEFAULT_GROQ_MODEL = "openai/gpt-oss-20b"  # change with GROQ_MODEL in .env
@@ -82,7 +82,7 @@ def model_name(llm):
 def llm_error(error, task):
     """Turn an LLM error into a short PreCueError. task: what we were doing, e.g. "adding context"."""
     if isinstance(error, (ModelRateLimitError, groq.RateLimitError)):
-        return PreCueError(
+        return RateLimitError(
             f"LLM free-tier limit reached while {task}. Wait a minute (or until tomorrow for the "
             "daily limit) and run again. Finished work is cached, so nothing is lost."
         )

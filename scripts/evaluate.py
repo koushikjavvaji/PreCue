@@ -28,7 +28,7 @@ from app.retriever import Retriever
 
 def main():
     parser = argparse.ArgumentParser(description="Evaluate PreCue search.")
-    parser.add_argument("file", help="the document (.txt or .md)")
+    parser.add_argument("file", help="the document (.txt, .md, .pdf, .docx or .pptx)")
     parser.add_argument("questions", help="the questions file (.json)")
     parser.add_argument("--modes", nargs="+", choices=MODES, default=MODES)
     args = parser.parse_args()

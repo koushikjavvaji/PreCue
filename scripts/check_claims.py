@@ -16,18 +16,20 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from app.errors import PreCueError
+from app.errors import PreCueError, RateLimitError
 from app.fact_checker import check_claim
 from app.index import MODES
 from app.llm import get_live_llm, model_name
 from app.prepare import prepare
 
 TOP_K = 3
+RATE_LIMIT_WAIT = 30  # seconds; the free tier's per-minute token budget refills within a minute
+RATE_LIMIT_TRIES = 4
 
 
 def main():
     parser = argparse.ArgumentParser(description="Check spoken claims against a document.")
-    parser.add_argument("file", help="the document (.txt or .md)")
+    parser.add_argument("file", help="the document (.txt, .md, .pdf, .docx or .pptx)")
     parser.add_argument("--mode", choices=MODES, default="plain")
     parser.add_argument("--eval", help="a claims file (.json) to measure accuracy")
     args = parser.parse_args()
@@ -57,8 +59,22 @@ def show(verdict):
     print(f"  verdict      : {verdict['verdict']}")
     print(f"  said         : {verdict['said'] or '-'}")
     print(f"  document says: {verdict['document_says'] or '-'}  [{verdict['section'] or '-'}]")
-    if verdict["correction"]:
-        print(f"  correction   : {verdict['correction']}")
+
+
+def check_waiting_for_limits(claim, retriever, facts, llm):
+    """Check one claim. An evaluation sends claims back to back, faster than a meeting would,
+    so it can hit the free tier's per-minute limit: then wait and try again.
+    Returns (verdict, seconds the check itself took)."""
+    for attempt in range(RATE_LIMIT_TRIES):
+        start = time.time()
+        try:
+            verdict = check_claim(claim, retriever.search(claim, top_k=TOP_K), facts, llm)
+            return verdict, time.time() - start
+        except RateLimitError:
+            if attempt == RATE_LIMIT_TRIES - 1:
+                raise
+            print(f"     (free-tier limit, waiting {RATE_LIMIT_WAIT} s)")
+            time.sleep(RATE_LIMIT_WAIT)
 
 
 def evaluate(path, retriever, facts, llm):
@@ -72,15 +88,13 @@ def evaluate(path, retriever, facts, llm):
     false_alerts = 0  # said "wrong" when the speaker was not wrong: the worst mistake
     times = []
     for item in claims:
-        start = time.time()
-        results = retriever.search(item["claim"], top_k=TOP_K)
         try:
-            verdict = check_claim(item["claim"], results, facts, llm)
+            verdict, seconds = check_waiting_for_limits(item["claim"], retriever, facts, llm)
         except PreCueError as error:
             failed += 1
             print(f"FAIL expected {item['verdict']:<15} {error} | {item['claim']}")
             continue
-        times.append(time.time() - start)
+        times.append(seconds)
 
         ok = verdict["verdict"] == item["verdict"]
         right += ok

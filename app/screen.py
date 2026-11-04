@@ -11,6 +11,10 @@ How it works:
   - A page opened late still sees the recent history (we replay it).
     "/events?live=1" skips the history: the pop-up must never show old alerts.
 
+Security: the transcript is private, so only pages opened as http://127.0.0.1:<port>
+or http://localhost:<port> are served. A website could otherwise point its own name at
+127.0.0.1 ("DNS rebinding") and read the transcript from inside your browser.
+
 No extra libraries: only the Python standard library and plain JavaScript.
 """
 
@@ -28,6 +32,7 @@ WEB = Path(__file__).parent.parent / "web"
 PAGES = {"/": WEB / "index.html", "/overlay": WEB / "overlay.html"}
 HISTORY = 200  # events replayed to a page that opens late
 PING_SECONDS = 15  # a small "still here" message so the browser keeps the connection
+MAX_WAITING = 500  # events waiting for one slow page; more are dropped instead of filling the memory
 
 
 class LiveScreen:
@@ -48,13 +53,17 @@ class LiveScreen:
             if event["type"] != "partial":  # partial text changes all the time; no need to replay it
                 self.history.append(event)
             for client in self.clients:
-                client.put(event)
+                if not client.full():  # a page that stopped reading must not grow without limit
+                    client.put(event)
 
     def _make_handler(self):
         screen = self  # the handler class below needs to reach this LiveScreen
 
         class Handler(BaseHTTPRequestHandler):
             def do_GET(self):
+                if not self._from_this_computer():
+                    self.send_error(403)
+                    return
                 url = urlparse(self.path)  # "/events?live=1" -> path "/events", query "live=1"
                 if url.path in PAGES:
                     self._send_page(PAGES[url.path])
@@ -63,6 +72,11 @@ class LiveScreen:
                     self._stream_events(replay=not live_only)
                 else:
                     self.send_error(404)
+
+            def _from_this_computer(self):
+                """True if the page was opened as 127.0.0.1 or localhost (blocks DNS rebinding)."""
+                port = self.server.server_address[1]
+                return self.headers.get("Host") in (f"127.0.0.1:{port}", f"localhost:{port}")
 
             def _send_page(self, page):
                 body = page.read_bytes()
@@ -78,7 +92,7 @@ class LiveScreen:
                 self.send_header("Cache-Control", "no-cache")
                 self.end_headers()
 
-                client = queue.Queue()
+                client = queue.Queue(maxsize=MAX_WAITING)
                 with screen.lock:
                     if replay:
                         for event in screen.history:  # catch up on what happened before the page opened
