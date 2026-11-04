@@ -100,8 +100,20 @@ def structured(llm, schema):
 
         return RunnableLambda(ask)
     if isinstance(llm, ChatGroq):
-        return llm.with_structured_output(schema, method="json_schema", strict=True)
+        shaped = llm.with_structured_output(schema, method="json_schema", strict=True)
+        return RunnableLambda(lambda prompt: _ask_twice_if_json_fails(shaped, prompt))
     return llm.with_structured_output(schema)
+
+
+def _ask_twice_if_json_fails(shaped, prompt):
+    """Now and then (about 2 in 100) Groq answers "Failed to validate JSON": the model wrote an
+    answer that does not fit the shape. A second try almost always works."""
+    try:
+        return shaped.invoke(prompt)
+    except groq.BadRequestError as error:
+        if "validate JSON" not in str(error):
+            raise
+        return shaped.invoke(prompt)
 
 
 def model_name(llm):

@@ -156,3 +156,40 @@ def test_facts_from_one_call_go_to_their_own_chunk(monkeypatch, tmp_path):
 
     extract_facts(chunks, "document", reader, model_name="test")
     assert len(reader.prompts) == 1  # cached: no new call
+
+
+def bad_json():
+    response = httpx.Response(400, request=httpx.Request("POST", "https://api.groq.com"))
+    return groq.BadRequestError("Failed to validate JSON. Please adjust your prompt.", response=response, body=None)
+
+
+class Flaky:
+    """Fails with the given errors first, then answers."""
+
+    def __init__(self, *errors):
+        self.errors, self.asked = list(errors), 0
+
+    def invoke(self, prompt):
+        self.asked += 1
+        if self.errors:
+            raise self.errors.pop(0)
+        return "answer"
+
+
+def test_groq_json_failure_is_tried_again(monkeypatch):
+    monkeypatch.setenv("GROQ_API_KEY", "test-key")
+    from app.llm import get_groq
+    model = Flaky(bad_json())
+    monkeypatch.setattr("app.llm.ChatGroq.with_structured_output", lambda self, *a, **k: model)
+    assert structured(get_groq(), dict).invoke("hi") == "answer" and model.asked == 2
+
+
+def test_other_bad_requests_are_not_tried_again(monkeypatch):
+    monkeypatch.setenv("GROQ_API_KEY", "test-key")
+    from app.llm import get_groq
+    response = httpx.Response(400, request=httpx.Request("POST", "https://api.groq.com"))
+    model = Flaky(groq.BadRequestError("Prompt too long", response=response, body=None))
+    monkeypatch.setattr("app.llm.ChatGroq.with_structured_output", lambda self, *a, **k: model)
+    with pytest.raises(groq.BadRequestError):
+        structured(get_groq(), dict).invoke("hi")
+    assert model.asked == 1
