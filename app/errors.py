@@ -14,7 +14,14 @@ class MicError(PreCueError):
 
 
 class RateLimitError(PreCueError):
-    """An LLM's free-tier limit was reached. Waiting (a minute, or a day) helps."""
+    """An LLM's free-tier limit was reached. Waiting (a minute, or a day) helps.
+
+    daily=True: the daily limit, so waiting a minute will not help.
+    """
+
+    def __init__(self, message, daily=False):
+        super().__init__(message)
+        self.daily = daily
 
 
 class ConnectionLostError(STTError):

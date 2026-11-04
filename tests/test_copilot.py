@@ -209,3 +209,23 @@ def test_correction_without_a_number_is_dropped():
     llm = FakeLLM({**WRONG, "document_says": "a lot"})
     verdict = check_claim("Revenue was 100 crore", FakeRetriever().search("x"), FakeFacts(), llm)
     assert verdict["verdict"] == "not_in_document"
+
+
+def test_same_amount_in_other_units_is_not_an_alert():
+    """The LLM called it wrong, but ₹10 crore IS 100 million rupees."""
+    llm = FakeLLM({**WRONG, "said": "100 million rupees", "document_says": "₹10 crore"})
+    verdict = check_claim("Revenue was 100 million rupees", FakeRetriever().search("x"), FakeFacts(), llm)
+    assert verdict["verdict"] == "correct"
+
+
+def test_hedged_rounding_is_not_an_alert_but_an_exact_one_is():
+    results = [chunk(4, "4. Team", "Headcount grew to 1,240.")]
+    llm = FakeLLM({**WRONG, "said": "1,200", "document_says": "1,240"})
+    assert check_claim("We have around 1,200 people", results, FakeFacts(), llm)["verdict"] == "correct"
+    assert check_claim("We have 1,200 people", results, FakeFacts(), llm)["verdict"] == "wrong"
+
+
+def test_spoken_number_words_become_digits_before_the_check():
+    copilot, llm = make_copilot(CORRECT)
+    copilot.handle("sentence", "Revenue was one hundred crore.")
+    assert "Revenue was 100 crore." in llm.prompts[-1]

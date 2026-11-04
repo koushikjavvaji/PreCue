@@ -10,6 +10,8 @@ Golden rule: a wrong alert is worse than no alert. So:
   - the prompt tells the LLM to answer "not_in_document" when unsure
   - a "wrong" verdict is only trusted if the value the LLM quotes from the
     document really appears in the chunks or facts (the LLM cannot invent the correction)
+  - a "wrong" verdict is dropped if both values are the same amount in other units
+    ("24 lakh" = "2.4 million") or a fair rounding of a hedged claim ("about 1,200" for 1,240)
 """
 
 import re
@@ -20,9 +22,11 @@ from pydantic import BaseModel, Field
 from app.errors import PreCueError
 from app.facts import fact_text, is_grounded
 from app.llm import LLM_ERRORS, llm_error, structured
+from app.numbers import is_hedged, same_value
 
 
-CLOSEST_FACTS = 5  # facts found by meaning, on top of the facts of the top chunks
+CHUNK_FACTS = 10  # at most this many facts from the found chunks (closest to the claim first)
+CLOSEST_FACTS = 5  # facts found by meaning anywhere in the document, on top of those
 MAX_VALUE_WORDS = 6  # a real value is short ("1,850 transactions per second"); a sentence is not a value
 
 
@@ -69,8 +73,7 @@ When in doubt, answer "not_in_document". A wrong alert is worse than no alert.""
 def check_claim(claim, results, facts, llm):
     """Return the verdict (a dict) for a claim. results: search results, facts: the FactsTable."""
     chunks_text = "\n\n".join(r.metadata.get("original", r.page_content) for r in results)
-    rows = facts.for_chunks(results)
-    rows += [fact for fact in facts.closest(claim, top_k=CLOSEST_FACTS) if fact not in rows]
+    rows = facts.for_claim(claim, results, from_chunks=CHUNK_FACTS, closest=CLOSEST_FACTS)
     facts_text = "\n".join(f"- {fact_text(fact)}" for fact in rows)
 
     prompt = PROMPT.format(claim=claim, facts=facts_text or "(none)", chunks=chunks_text)
@@ -85,8 +88,20 @@ def check_claim(claim, results, facts, llm):
     evidence = chunks_text + "\n" + facts_text  # facts are already checked against their chunks
     if verdict["verdict"] == "wrong" and not _is_trustworthy(verdict["document_says"], evidence):
         verdict["verdict"] = "not_in_document"  # the LLM's "correct value" is not in the document
+    if verdict["verdict"] == "wrong" and _same_value(claim, verdict):
+        verdict["verdict"] = "correct"  # "24 lakh" for "2.4 million": the same amount, said another way
     verdict["claim"] = claim
     return verdict
+
+
+def _same_value(claim, verdict):
+    """True if the speaker's value IS the document's value, after converting units or a fair rounding.
+
+    The LLM is weak at unit maths ("1,486 million" vs "₹148.6 crore"), so this is done in code.
+    It can only remove an alert, never add one.
+    """
+    said = verdict["said"] if re.search(r"\d", verdict["said"]) else claim
+    return same_value(said, verdict["document_says"], hedged=is_hedged(claim))
 
 
 def _is_trustworthy(document_says, evidence):

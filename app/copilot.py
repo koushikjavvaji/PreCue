@@ -10,7 +10,8 @@ The steps are a LangGraph graph:
   START ────┤                   └────────────── no ─────────────────────────────────────> END
             └── pause ─────> suggest ─────────────────────────────────────────────────> END
 
-  listen  : join a split sentence, search the document, remember what was covered
+  listen  : write spoken numbers as digits, join a split sentence, search the document,
+            remember what was covered
   check   : ask the LLM whether the claim is correct (fact_checker.py)
   decide  : alert only if the claim is wrong AND we have not alerted about it before
   suggest : point to the next section the speaker has not talked about yet
@@ -29,6 +30,7 @@ from langgraph.graph import END, START, StateGraph
 from app.errors import PreCueError
 from app.fact_checker import check_claim
 from app.facts import numbers_in
+from app.numbers import words_to_digits
 from app.retriever import has_number
 
 # "Q2", "H1", "FY2026" name a period, not a fact. "Let's talk about Q2" is small talk.
@@ -121,7 +123,7 @@ class Copilot:
     # ---- the nodes. Each one reads the state and returns only what it changes. ----
 
     def _listen(self, state):
-        text = state["text"]
+        text = words_to_digits(state["text"])  # "ninety six" -> "96": search and the LLM do better with digits
         recent = state["recent"]
 
         # "100 crore." has a number but no topic. It probably finishes the sentence

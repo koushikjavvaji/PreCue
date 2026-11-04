@@ -113,6 +113,7 @@ Optional settings in `.env`:
 - `GEMINI_MODEL`: the Gemini model to use (default `gemini-3.5-flash-lite`)
 - `GEMINI_REQUESTS_PER_MINUTE`: how fast to call Gemini (default `15`, the free-tier limit). Calls are spaced out automatically.
 - `GROQ_MODEL` (default `openai/gpt-oss-20b`) and `GROQ_REQUESTS_PER_MINUTE` (default `30`)
+- `GROQ_BACKUP_MODEL` (default `openai/gpt-oss-120b`): used automatically when `GROQ_MODEL` hits its free-tier limit. Each Groq model has its own limit (200,000 tokens a day, about 150 checks), so the backup doubles how many checks you get a day.
 - `LIVE_LLM`: `groq` (default) or `gemini`, if you have no Groq key. Gemini is fine for `check_claims`, but too slow for a live meeting: in our test a check took about 20 seconds, so most alerts came too late and were skipped.
 - `WHISPER_DEVICE`: part of your earphones' name, e.g. `AirPods`. List devices with `python -m sounddevice`. Without it, whispers play on the default output.
 - `WHISPER_VOLUME`: from `0` to `1` (default `0.6`)

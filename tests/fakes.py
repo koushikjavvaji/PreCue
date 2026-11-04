@@ -42,6 +42,9 @@ class FakeFacts:
     def closest(self, claim, top_k=5):
         return []
 
+    def for_claim(self, claim, chunks, from_chunks=10, closest=5):
+        return self.for_chunks(chunks)[:from_chunks]
+
 
 class FakeLLM:
     """Always gives the same verdict (or raises an error). Counts how often it was asked."""
@@ -50,12 +53,14 @@ class FakeLLM:
         self.verdict = verdict
         self.error = error
         self.calls = 0
+        self.prompts = []
 
     def with_structured_output(self, schema):
         return self
 
     def invoke(self, prompt):
         self.calls += 1
+        self.prompts.append(prompt)
         if self.error:
             raise self.error
         return Verdict(**self.verdict)
