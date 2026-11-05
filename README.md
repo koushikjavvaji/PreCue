@@ -93,7 +93,7 @@ Early stage. Built so far:
 - **Built for long meetings**: keeps the connection alive through silence, reconnects after network drops, joins sentences split by a pause
 - **Short phrases end on time**: after 0.8 s of silence PreCue asks Deepgram to finish the sentence, so "99 percent." is not glued to the next sentence
 - **The app**: one page in your browser (only on this computer) to add your keys, drop in a report and start a meeting, with live progress, a transcript that marks every checked sentence (verified, check this, not in the report) and a summary at the end
-- **Automated tests**: 225 offline tests (no keys, no microphone), plus real-window overlay tests, for the decision engine, fact-check safety rules, number handling, chunking, documents, speech events, reconnects, the live screen, whispers and the overlay. They run on macOS, Windows and Linux on every push
+- **Automated tests**: 243 offline tests (no keys, no microphone), plus real-window overlay tests, for the decision engine, fact-check safety rules, number handling, chunking, documents, speech events, reconnects, the live screen, the app and its API, the website backend, whispers and the overlay. They run on macOS, Windows and Linux on every push
 
 Coming next: scanned PDFs (OCR), charts and images inside documents.
 

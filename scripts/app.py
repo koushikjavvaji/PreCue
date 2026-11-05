@@ -12,7 +12,9 @@ The page talks to app/session.py; the meeting itself is the same as scripts/live
 
 import argparse
 import encodings.idna  # noqa: F401  (loaded now: two threads loading it at once on their first web request can freeze)
+import json
 import time
+import urllib.request
 import webbrowser
 
 from dotenv import load_dotenv
@@ -29,6 +31,12 @@ def main():
     args = parser.parse_args()
 
     load_dotenv()
+    url = f"http://127.0.0.1:{args.port}"
+    if already_running(url):  # double-clicked again: show the PreCue that is already open
+        print(f"PreCue is already running at {url}")
+        if not args.no_browser:
+            webbrowser.open(url)
+        return
     app = PreCueApp()  # starts loading the search model in the background right away
     screen = LiveScreen(port=args.port, api=app)
     app.screen = screen
@@ -42,10 +50,19 @@ def main():
         app.stop()
 
 
+def already_running(url):
+    """True if PreCue already answers at this address."""
+    try:
+        with urllib.request.urlopen(f"{url}/api/state", timeout=2) as response:
+            return "session" in json.load(response)
+    except (OSError, ValueError):
+        return False
+
+
 if __name__ == "__main__":
     try:
         main()
     except PreCueError as error:
-        raise SystemExit(f"Error: {error}")
+        raise SystemExit(f"Error: {error}") from None
     except KeyboardInterrupt:
         print("\nPreCue stopped.")

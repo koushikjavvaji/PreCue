@@ -34,7 +34,12 @@ only on `127.0.0.1` (this computer).
   (never a file path).
 - **Saved keys and uploads**: keys typed into the app go into `.env`, written so only your user
   account can read it. Uploaded documents are kept in `data/uploads` (never committed), also
-  readable by you only, with their names cleaned (no folders, no odd characters).
+  readable by you only, with their names cleaned (no folders, no odd characters). Remove one
+  with the × next to it in the app; the samples cannot be removed. (Its cached text and facts stay
+  in `data/cache` until you delete that folder.)
+- **The website** (getprecue.vercel.app) is a static page plus one small function that reads the
+  latest version from GitHub. It never receives your documents, keys or transcripts, and it sends
+  strict security headers (no outside scripts, no framing, no camera or microphone).
 - **Text on the screen is never run as code**: the pages show speech and LLM text with
   `textContent`, never `innerHTML`.
 - **Booby-trapped documents** (prompt injection): a document could contain text like

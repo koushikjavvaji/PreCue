@@ -9,11 +9,11 @@ They need Screen Recording permission for your terminal
 (System Settings > Privacy & Security > Screen Recording).
 """
 
-import json
 import os
 import socket
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 import urllib.request
@@ -124,11 +124,10 @@ def screenshot_with_screencapture():
     """The macOS screenshot tool. Returns the screen as an (height, width, 3) array."""
     from PIL import Image
 
-    path = f"/tmp/precue_test_{os.getpid()}.png"
-    subprocess.run(["screencapture", "-x", path], check=True)
-    image = np.asarray(Image.open(path).convert("RGB")).astype(int)
-    os.remove(path)
-    return image
+    with tempfile.TemporaryDirectory() as folder:  # a private folder, not a shared /tmp name
+        path = os.path.join(folder, "screen.png")
+        subprocess.run(["screencapture", "-x", path], check=True)
+        return np.asarray(Image.open(path).convert("RGB")).astype(int)
 
 
 def screenshot_with_screencapturekit():

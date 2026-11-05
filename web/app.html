@@ -152,6 +152,11 @@
   .doc .meta { flex: 1; min-width: 0; }
   .doc .title { font-weight: 550; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .doc .info { color: var(--muted); font-size: 12px; }
+  .doc .remove { width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center; color: var(--muted); font-size: 18px; line-height: 1;
+                 opacity: 0; transition: opacity .2s, background .2s, color .2s; flex: none; }
+  .doc:hover .remove, .doc .remove:focus-visible { opacity: 1; }
+  .doc .remove:hover { background: var(--red-bg); color: var(--red); }
+  @media (hover: none) { .doc .remove { opacity: 1; } }
   .doc .tick { width: 20px; height: 20px; border-radius: 50%; border: 1.5px solid var(--line-2); flex: none; display: grid; place-items: center; transition: all .25s var(--spring); }
   .doc.on .tick { background: var(--violet); border-color: transparent; transform: scale(1.05); }
   .doc.on .tick::after { content: ""; width: 8px; height: 5px; border: 2px solid #fff; border-top: 0; border-right: 0; transform: rotate(-45deg) translate(1px, -1px); }
@@ -526,11 +531,9 @@ function show(name) {
 // ---------------- home: keys ----------------
 function renderKeys() {
   const pills = $("key-pills"); pills.replaceChildren();
-  let ready = 0;
   for (const key of app.keys) {
     const checked = keysChecked[key.id];
     const state = !key.set ? "off" : checked === undefined ? "wait" : checked.works ? "ok" : "bad";
-    if (state === "ok" || (state === "wait" && key.set)) ready += key.set ? 1 : 0;
     const pill = el("span", "pill " + state);
     pill.append(el("span", "dot " + (state === "ok" ? "ok" : state === "bad" ? "bad" : state === "wait" ? "wait" : "")), el("span", "", key.name));
     pill.title = !key.set ? "Not set yet" : checked ? checked.message : "Checking...";
@@ -597,12 +600,29 @@ function renderDocs() {
     const [fg, bg] = KIND_COLORS[d.kind] || KIND_COLORS.txt;
     const icon = el("span", "icon", d.kind); icon.style.color = fg; icon.style.background = bg;
     const meta = el("span", "meta"); meta.append(el("div", "title", d.name), el("div", "info", (d.sample ? "Sample report · " : "") + sizeText(d.size)));
-    b.append(icon, meta, el("span", "tick"));
+    b.append(icon, meta);
+    if (!d.sample) {
+      const remove = el("span", "remove", "×");
+      remove.title = "Remove from this computer"; remove.setAttribute("role", "button"); remove.tabIndex = 0;
+      const ask = (e) => { e.stopPropagation(); removeDoc(d); };
+      remove.addEventListener("click", ask);
+      remove.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") ask(e); });
+      b.append(remove);
+    }
+    b.append(el("span", "tick"));
     b.addEventListener("click", () => { chosen = d.id; renderDocs(); });
     docs.append(b);
   }
   $("step-doc").classList.toggle("done", !!chosen);
   updateStart();
+}
+
+async function removeDoc(d) {
+  if (!confirm(`Remove ${d.name} from this computer?`)) return;
+  try {
+    const data = await api("/api/documents/remove", { document: d.id });
+    app.documents = data.documents; renderDocs(); toast(`${d.name} removed.`, "ok");
+  } catch (e) { toast(e.message, "bad"); }
 }
 
 async function upload(file) {
@@ -809,7 +829,10 @@ function listen() {
 
 function setEngine() {
   const chip = $("engine");
-  chip.replaceChildren(el("span", "dot " + (app.model_ready ? "ok" : "wait")), el("span", "", app.model_ready ? "Ready" : "Warming up"));
+  const failed = app.model_ready && app.model_error;
+  chip.replaceChildren(el("span", "dot " + (failed ? "bad" : app.model_ready ? "ok" : "wait")),
+                       el("span", "", failed ? "Search model failed" : app.model_ready ? "Ready" : "Warming up"));
+  chip.title = failed ? app.model_error + " Check your internet connection and restart PreCue." : "";
 }
 
 async function refresh() {
@@ -817,7 +840,10 @@ async function refresh() {
     const data = await api("/api/state");
     app = { ...app, ...data };
     renderKeys(); renderDocs();
-    if (!$("device").options.length) renderDevices();
+    if (!$("device").options.length) {
+      renderDevices();
+      if (!data.overlay_hidden_from_sharing) $("overlay").checked = false;  // here the meeting could see it
+    }
     $("overlay-note").textContent = data.overlay_hidden_from_sharing ? "Over your meeting, hidden from screen sharing" : "Over your meeting (share one window, not your whole screen)";
     setEngine(); updateStart();
     if (!data.model_ready) setTimeout(refresh, 1200);

@@ -59,6 +59,7 @@ class PreCueApp:
         self.stt = None
         self.cancel = threading.Event()  # Stop pressed
         self._embedder = None
+        self._model_error = ""  # why the search model could not be loaded, for the page
         self._model_ready = threading.Event()
         self._key_checks = None  # (time, result): the last answer from the providers
         if load_model:
@@ -76,10 +77,13 @@ class PreCueApp:
                 "devices": output_devices(),
                 "overlay_hidden_from_sharing": sys.platform in ("darwin", "win32"),
                 "model_ready": self._model_ready.is_set(),
+                "model_error": self._model_error,
             }
         return 404, {"error": "Not found"}
 
     def post(self, path, body, headers):
+        if not isinstance(body, (dict, bytes)):
+            return 400, {"error": "Send a JSON object."}
         try:
             if path == "/api/keys":
                 return self._save_keys(body.get("keys", {}))
@@ -88,6 +92,8 @@ class PreCueApp:
                 return 200, {"keys": self._key_checks[1] if fresh else self._check_all()}
             if path == "/api/upload":
                 return self._upload(headers.get("X-File-Name", ""), body)
+            if path == "/api/documents/remove":
+                return self._remove(body.get("document"))
             if path == "/api/start":
                 return self._start(body)
             if path == "/api/stop":
@@ -95,6 +101,8 @@ class PreCueApp:
                 return 200, {"session": self.state}
         except (PreCueError, ValueError) as error:
             return 400, {"error": str(error)}
+        except OSError as error:  # e.g. the disk is full: say so, instead of dropping the connection
+            return 500, {"error": f"Could not save: {error.strerror or error}"}
         return 404, {"error": "Not found"}
 
     # ---------------- keys and documents ----------------
@@ -126,6 +134,16 @@ class PreCueApp:
         os.chmod(temporary, 0o600)
         os.replace(temporary, path)
         return 200, {"document": document_entry(path, "uploads"), "documents": documents()}
+
+    def _remove(self, document_id):
+        """Delete an uploaded document from this computer. Samples cannot be removed."""
+        document = find_document(document_id)
+        if document is None or document["sample"]:
+            raise PreCueError("Only your own uploaded documents can be removed.")
+        if self.state["state"] in ("preparing", "live", "stopping") and self.state.get("document") == document["name"]:
+            raise PreCueError("This document is in use. End the meeting first.")
+        document_path(document["id"]).unlink(missing_ok=True)
+        return 200, {"documents": documents()}
 
     # ---------------- the meeting ----------------
 
@@ -167,7 +185,8 @@ class PreCueApp:
         try:
             self._step("Loading the search model")
             if not self._model_ready.wait(timeout=MODEL_WAIT_SECONDS) or self._embedder is None:
-                raise PreCueError("The search model could not be loaded. Check your internet connection and restart.")
+                raise PreCueError("The search model could not be loaded. Check your internet connection and restart PreCue. "
+                                  + self._model_error)
             retriever, facts = prepare(document_path(document["id"]), embedder=self._embedder, report=self._report)
             self._step("Connecting the live fact-checker")
             llm = get_live_llm()
@@ -241,10 +260,11 @@ class PreCueApp:
         if kind == "step":
             self._step(text)
         elif kind == "progress":
-            steps = self.state["steps"]
+            # A new list: the events already sent to the page must not change afterwards.
+            steps = [dict(step) for step in self.state["steps"]]
             if steps:
                 steps[-1]["progress"] = text
-            self._set(self.state["state"], self.state["text"])
+            self._set(self.state["state"], self.state["text"], steps=steps)
         elif kind == "warning":
             self._set(self.state["state"], self.state["text"], warnings=self.state["warnings"] + [text])
 
@@ -268,18 +288,25 @@ class PreCueApp:
             from app.prepare import prepare  # noqa: F401  (imports LangChain now, not when Start is pressed)
 
             self._embedder = Embedder()
-        except PreCueError as error:
-            print(f"Could not load the search model: {error}")
+        except Exception as error:  # shown on the page, so the user knows why Start cannot work
+            self._model_error = str(error) or type(error).__name__
+            print(f"Could not load the search model: {self._model_error}")
         finally:
             self._model_ready.set()
 
 
 def documents():
     """The documents to choose from: your uploads (newest first), then the samples."""
-    uploads = sorted(UPLOADS.glob("*"), key=lambda p: p.stat().st_mtime, reverse=True) if UPLOADS.exists() else []
-    found = [document_entry(p, "uploads") for p in uploads if p.suffix.lower() in SUPPORTED_FILES]
-    found += [document_entry(SAMPLES / name, "samples") for name in SAMPLE_DOCUMENTS if (SAMPLES / name).exists()]
-    return found
+    uploads = []
+    for path in UPLOADS.glob("*") if UPLOADS.exists() else []:
+        try:
+            if path.suffix.lower() in SUPPORTED_FILES:
+                uploads.append((path.stat().st_mtime, document_entry(path, "uploads")))
+        except FileNotFoundError:
+            pass  # removed a moment ago
+    uploads.sort(key=lambda pair: pair[0], reverse=True)
+    samples = [document_entry(SAMPLES / name, "samples") for name in SAMPLE_DOCUMENTS if (SAMPLES / name).exists()]
+    return [entry for _, entry in uploads] + samples
 
 
 def document_entry(path, folder):

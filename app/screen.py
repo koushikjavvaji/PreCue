@@ -137,6 +137,9 @@ class LiveScreen:
                     except ValueError:
                         self._send_json(400, {"error": "Not valid JSON."})
                         return
+                    if not isinstance(body, dict):
+                        self._send_json(400, {"error": "Send a JSON object."})
+                        return
                 self._send_json(*screen.api.post(self.path, body, self.headers))
 
             def _from_our_page(self):

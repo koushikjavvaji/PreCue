@@ -196,7 +196,7 @@ def test_key_check_reads_the_providers_answer(monkeypatch, code, works):
 
 def test_upload_keeps_only_a_safe_name(server, folders):
     _, screen = server
-    status, data = call(screen, "/api/upload", "# Plan\n\nWe grew 5%.".encode(), kind="application/octet-stream",
+    status, data = call(screen, "/api/upload", b"# Plan\n\nWe grew 5%.", kind="application/octet-stream",
                         headers={"X-File-Name": "..%2F..%2Fevil%20plan%3B.md"})
     assert status == 200
     assert data["document"]["id"] == "uploads/evil plan_.md"
@@ -362,3 +362,75 @@ def test_a_listening_failure_ends_the_meeting_with_its_message(server, fakes, mo
     call(screen, "/api/start", {"document": "samples/sample_report.txt", "voice": False})
     assert wait_for(lambda: precue.state["state"] == "error")
     assert precue.state["text"] == "Deepgram rejected your API key."
+
+
+# ---------------- found in the full scan ----------------
+
+def test_uploaded_documents_can_be_removed_but_samples_cannot(server, folders):
+    _, screen = server
+    call(screen, "/api/upload", b"# Plan\n\nWe grew 5%.", kind="application/octet-stream", headers={"X-File-Name": "plan.md"})
+    status, data = call(screen, "/api/documents/remove", {"document": "uploads/plan.md"})
+    assert status == 200 and not (folders / "uploads" / "plan.md").exists()
+    assert [d["id"] for d in data["documents"]] == ["samples/sample_report.txt"]
+    for document in ["samples/sample_report.txt", "uploads/../../.env", "uploads/missing.md"]:
+        status, data = call(screen, "/api/documents/remove", {"document": document})
+        assert status == 400 and "uploaded documents" in data["error"]
+    assert (folders / "samples" / "sample_report.txt").exists()
+
+
+def test_a_document_in_use_cannot_be_removed(server, fakes):
+    precue, screen = server
+    call(screen, "/api/upload", b"# Plan\n\nWe grew 5%.", kind="application/octet-stream", headers={"X-File-Name": "plan.md"})
+    call(screen, "/api/start", {"document": "uploads/plan.md", "voice": False})
+    assert wait_for(lambda: precue.state["state"] == "live")
+    status, data = call(screen, "/api/documents/remove", {"document": "uploads/plan.md"})
+    assert status == 400 and "in use" in data["error"]
+
+
+@pytest.mark.parametrize("body", [b"[]", b'"text"', b"42"])
+def test_json_that_is_not_an_object_gets_a_clear_answer(server, body):
+    _, screen = server
+    status, data = call(screen, "/api/start", body)
+    assert status == 400 and data["error"] == "Send a JSON object."
+
+
+def test_a_disk_problem_is_reported_not_dropped(server, monkeypatch):
+    _, screen = server
+
+    def full_disk(*args, **kwargs):
+        raise OSError(28, "No space left on device")
+
+    monkeypatch.setattr(session.Path, "write_bytes", full_disk)
+    status, data = call(screen, "/api/upload", b"text", kind="application/octet-stream", headers={"X-File-Name": "a.txt"})
+    assert status == 500 and "No space left" in data["error"]
+
+
+def test_a_model_that_failed_to_load_is_shown_on_the_page(folders, monkeypatch):
+    import app.embedder
+
+    def broken(*args, **kwargs):
+        raise RuntimeError("model file is damaged")
+
+    monkeypatch.setattr(app.embedder, "Embedder", broken)
+    precue = session.PreCueApp(load_model=False)
+    precue._load_model()
+    status, data = precue.get("/api/state")
+    assert data["model_ready"] and data["model_error"] == "model file is damaged"
+
+
+def test_progress_does_not_change_events_already_sent(server):
+    precue, screen = server
+    seen = []
+    screen.clients.append(_Recorder(seen))
+    precue._set("preparing", "x", steps=[{"text": "Building the facts table", "done": False}])
+    precue._report("progress", "1/3")
+    precue._report("progress", "2/3")
+    assert [e["steps"][0].get("progress") for e in seen] == [None, "1/3", "2/3"]
+
+
+def test_starting_again_opens_the_running_precue(server, monkeypatch):
+    import scripts.app as launcher
+
+    _, screen = server
+    assert launcher.already_running(screen.url)
+    assert not launcher.already_running("http://127.0.0.1:1")

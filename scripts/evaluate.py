@@ -89,6 +89,6 @@ if __name__ == "__main__":
     try:
         main()
     except PreCueError as error:
-        raise SystemExit(f"Error: {error}")
+        raise SystemExit(f"Error: {error}") from None
     except KeyboardInterrupt:
         print("\nStopped.")

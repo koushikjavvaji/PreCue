@@ -42,4 +42,4 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         print("\nStopped.")
     except PreCueError as error:
-        raise SystemExit(f"Error: {error}")  # clear message, exit code 1, no ugly traceback
+        raise SystemExit(f"Error: {error}") from None  # clear message, exit code 1, no ugly traceback
