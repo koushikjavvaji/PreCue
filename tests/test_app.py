@@ -184,6 +184,7 @@ def test_key_check_reads_the_providers_answer(monkeypatch, code, works):
 
     def fake_open(request, **kwargs):
         assert request.get_header("Authorization") == "Bearer gsk_x"
+        assert request.get_header("User-agent").startswith("PreCue/")  # Groq's firewall blocks Python's default
         if code != 200:
             raise urllib.error.HTTPError(request.full_url, code, "", {}, None)
         return Answer()

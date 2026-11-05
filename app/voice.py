@@ -25,6 +25,7 @@ import numpy as np
 import sounddevice as sd
 
 from app.errors import PreCueError
+from app.settings import USER_AGENT
 from app.stt import SSL_CONTEXT
 
 TTS_URL = "https://api.deepgram.com/v1/speak"
@@ -84,7 +85,8 @@ class Whisperer:
         request = urllib.request.Request(
             url,
             data=json.dumps({"text": text}).encode(),
-            headers={"Authorization": f"Token {self.api_key}", "Content-Type": "application/json"},
+            headers={"Authorization": f"Token {self.api_key}", "Content-Type": "application/json",
+                     "User-Agent": USER_AGENT},
         )
         self.quiet_until = time.time() + 60  # ignore the mic while we speak (corrected at the end)
         try:

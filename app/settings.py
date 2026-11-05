@@ -36,6 +36,7 @@ KEYS = {
     },
 }
 MAX_KEY_LENGTH = 300
+USER_AGENT = "PreCue/1.0 (+https://getprecue.vercel.app)"
 
 
 def key_is_set(name):
@@ -89,7 +90,10 @@ def check_key(name):
     if not key_is_set(name):
         return False, "Not set"
     info = KEYS[name]
-    request = urllib.request.Request(info["check"], headers=info["header"](os.environ[name]))
+    # A User-Agent of our own: Groq's firewall refuses Python's default one ("error code: 1010"),
+    # which made a good Groq key look rejected.
+    headers = {**info["header"](os.environ[name]), "User-Agent": USER_AGENT}
+    request = urllib.request.Request(info["check"], headers=headers)
     try:
         with urllib.request.urlopen(request, context=SSL_CONTEXT, timeout=8) as response:
             json.load(response)
