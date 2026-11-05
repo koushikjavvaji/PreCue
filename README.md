@@ -6,7 +6,7 @@
 
 PreCue is not another voice chatbot. It is a real-time communication assistant that stays almost invisible until you need it.
 
-**Website: [koushikjavvaji.github.io/PreCue](https://koushikjavvaji.github.io/PreCue/)** · Free, no account, no PreCue server.
+**Website: [getprecue.vercel.app](https://getprecue.vercel.app)** · Free, no account, no PreCue server.
 
 ### Quick start (no commands)
 
@@ -272,8 +272,10 @@ web/
   index.html        The live screen page
   overlay.html      The pop-up page shown in the overlay
 tests/              Offline tests (fake LLM, search and Deepgram)
-docs/
-  index.html        The public website (GitHub Pages)
+docs/               The public website, hosted on Vercel (deploy: npx vercel deploy --prod --cwd docs)
+  index.html        The page
+  api/release.py    Its backend: the latest version and download link, from GitHub (cached at the edge)
+  vercel.json       Security headers
 PreCue.command      Double-click to start on macOS (sets itself up the first time)
 PreCue.bat          Double-click to start on Windows
 scripts/
