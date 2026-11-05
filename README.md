@@ -272,7 +272,7 @@ web/
   index.html        The live screen page
   overlay.html      The pop-up page shown in the overlay
 tests/              Offline tests (fake LLM, search and Deepgram)
-docs/               The public website, hosted on Vercel (deploy: npx vercel deploy --prod --cwd docs)
+docs/               The public website on Vercel (every push to main deploys it)
   index.html        The page
   api/release.py    Its backend: the latest version and download link, from GitHub (cached at the edge)
   vercel.json       Security headers
