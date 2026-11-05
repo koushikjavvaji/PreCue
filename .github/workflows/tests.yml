@@ -27,7 +27,7 @@ jobs:
       - name: Install dependencies
         shell: bash
         run: |
-          python -m pip install --upgrade pip
+          python -m pip install --upgrade pip setuptools  # the runner's own copies can be old and unsafe
           # the CPU-only build of torch: much smaller, and the tests need no GPU
           pip install torch --index-url https://download.pytorch.org/whl/cpu
           pip install -r requirements.txt
