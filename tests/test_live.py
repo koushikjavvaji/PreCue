@@ -296,6 +296,16 @@ def test_screen_refuses_other_host_names():
         assert urllib.request.urlopen(request, timeout=3).status == 200
 
 
+def test_pages_cannot_load_or_send_anything_else():
+    screen = LiveScreen(port=free_port())
+    for path in ["/", "/overlay", "/events"]:
+        response = urllib.request.urlopen(screen.url + path, timeout=3)
+        policy = response.headers["Content-Security-Policy"]
+        assert "default-src 'none'" in policy and "connect-src 'self'" in policy and "frame-ancestors 'none'" in policy
+        assert response.headers["X-Content-Type-Options"] == "nosniff"
+        response.close()
+
+
 def test_slow_page_cannot_fill_the_memory():
     import app.screen as screen_module
 

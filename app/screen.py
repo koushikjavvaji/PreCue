@@ -34,6 +34,10 @@ WEB = Path(__file__).parent.parent / "web"
 PAGES = {"/": WEB / "index.html", "/overlay": WEB / "overlay.html"}
 HISTORY = 200  # events replayed to a page that opens late
 PING_SECONDS = 15  # a small "still here" message so the browser keeps the connection
+CONTENT_SECURITY_POLICY = (
+    "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; "  # the pages' own code only
+    "connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'"
+)
 MAX_WAITING = 500  # events waiting for one slow page; more are dropped instead of filling the memory
 
 
@@ -91,6 +95,14 @@ class LiveScreen:
                 else:
                     self.send_error(404)
 
+            def _send_safety_headers(self):
+                """Even if some text were ever shown as HTML, the page could not load or send anything:
+                no outside scripts, images or connections (only our own /events), no forms,
+                and no other website can show the page inside a frame."""
+                self.send_header("Content-Security-Policy", CONTENT_SECURITY_POLICY)
+                self.send_header("X-Content-Type-Options", "nosniff")
+                self.send_header("Referrer-Policy", "no-referrer")
+
             def _from_this_computer(self):
                 """True if the page was opened as 127.0.0.1 or localhost (blocks DNS rebinding)."""
                 port = self.server.server_address[1]
@@ -101,6 +113,7 @@ class LiveScreen:
                 self.send_response(200)
                 self.send_header("Content-Type", "text/html; charset=utf-8")
                 self.send_header("Content-Length", str(len(body)))
+                self._send_safety_headers()
                 self.end_headers()
                 self.wfile.write(body)
 
@@ -108,6 +121,7 @@ class LiveScreen:
                 self.send_response(200)
                 self.send_header("Content-Type", "text/event-stream")
                 self.send_header("Cache-Control", "no-cache")
+                self._send_safety_headers()
                 self.end_headers()
 
                 client = queue.Queue(maxsize=MAX_WAITING)
