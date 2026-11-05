@@ -67,15 +67,19 @@ period, never words like "earlier", "previous", "current", "now" or "last quarte
   - a goal or plan gets its target period (e.g. "Q3 FY2026 target")"""
 
 
-def extract_facts(chunks, document, llm, model_name):
-    """Return the facts table (a list of dicts) for the chunks of one document."""
+def extract_facts(chunks, document, llm, model_name, on_progress=None):
+    """Return the facts table (a list of dicts) for the chunks of one document.
+
+    on_progress(done, total) is called after each LLM call (the app shows a progress bar).
+    """
     path = cache_file("facts", model_name, document)
     cache = read_json(path) or {}
     reader = llm.with_structured_output(FactList)
 
     texts = [chunk.metadata.get("original", chunk.page_content) for chunk in chunks]  # without the context line
     todo = list(dict.fromkeys(text for text in texts if text not in cache))  # each new text once, in order
-    for group in groups(todo):
+    todo_groups = groups(todo)
+    for done, group in enumerate(todo_groups, start=1):
         found = _ask_llm(reader, chunks[0].metadata["title"], group)
         for number, text in enumerate(group, start=1):
             # Keep a fact only if its value really is in its own part (the LLM can invent, or mix up parts).
@@ -85,6 +89,8 @@ def extract_facts(chunks, document, llm, model_name):
                 if fact["part"] == number and is_grounded(fact["value"], text)
             ]
         write_json(path, cache)  # save after each call, so progress is not lost
+        if on_progress:
+            on_progress(done, len(todo_groups))
 
     table = []
     for chunk, text in zip(chunks, texts):

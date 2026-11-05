@@ -2,6 +2,7 @@
 
 import json
 import queue
+import socket
 import ssl
 import threading
 from urllib.parse import urlencode
@@ -36,6 +37,22 @@ class DeepgramSTT:
             raise STTError("No Deepgram API key given.")
         self.api_key = api_key
         self.model = model
+        self.connection = None
+        self.closing = False
+
+    def close(self):
+        """End the live connection from another thread (when the meeting stops). listen() then ends.
+
+        If the connection is still being opened, listen() sees `closing` right after and ends too.
+        """
+        self.closing = True
+        if self.connection:
+            # Cut the network connection: listen() ends at once. A polite close waits for Deepgram's
+            # goodbye, which can take 8 seconds, and there is nothing left to hear.
+            try:
+                self.connection.socket.shutdown(socket.SHUT_RDWR)
+            except OSError:
+                pass  # already closed
 
     def listen(self, audio_queue):
         """Send audio to Deepgram and give back events one by one.
@@ -49,7 +66,10 @@ class DeepgramSTT:
         Raises ConnectionLostError if the network fails (worth retrying),
         or STTError for other problems (like a wrong API key).
         """
-        connection = self._connect()
+        connection = self.connection = self._connect()
+        if self.closing:  # the meeting stopped while we were connecting
+            connection.close()
+            return
 
         # One thread sends audio, while this one receives the text.
         sender = threading.Thread(

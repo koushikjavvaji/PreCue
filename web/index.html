@@ -3,87 +3,123 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
 <title>PreCue Live</title>
 <style>
   :root {
-    --bg: #f6f7f9; --panel: #ffffff; --text: #1d2330; --muted: #6b7280; --line: #e3e6eb;
-    --alert: #c62828; --alert-bg: #fdecec; --suggest: #1d5fbf; --suggest-bg: #e8f0fc;
-    --ok: #2e7d32; --warn: #b26a00;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --bg: #12151b; --panel: #1b1f27; --text: #e7e9ee; --muted: #9aa1ad; --line: #2a303b;
-      --alert: #ff6b6b; --alert-bg: #3a1d20; --suggest: #7fb0ff; --suggest-bg: #1b2a42;
-      --ok: #6fcf75; --warn: #f0b350;
-    }
+    --bg: #07080d; --line: rgba(255, 255, 255, .08); --text: #f3f4f8; --soft: #b7bccb; --muted: #7d8396;
+    --brand: linear-gradient(135deg, #8b5cf6 0%, #6366f1 45%, #22d3ee 100%);
+    --red: #ff5470; --green: #34d399; --blue: #60a5fa; --amber: #fbbf24;
+    --ease: cubic-bezier(.2, .8, .2, 1); --spring: cubic-bezier(.34, 1.56, .64, 1);
   }
   * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--text);
-         font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-  header { display: flex; align-items: center; gap: 12px; padding: 12px 16px;
-           border-bottom: 1px solid var(--line); background: var(--panel); }
-  header h1 { font-size: 18px; margin: 0; }
-  #status { margin-left: auto; font-size: 14px; color: var(--muted); }
-  #status::before { content: "●"; margin-right: 6px; }
-  #status.listening::before { color: var(--ok); }
-  #status.reconnecting::before, #status.offline::before { color: var(--warn); }
-  main { display: grid; grid-template-columns: 3fr 2fr; gap: 16px; padding: 0 16px 16px;
-         height: calc(100vh - 80px); }
-  section { background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
-            padding: 12px 16px; overflow-y: auto; min-height: 0; }
-  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 0 0 8px; }
-  #transcript p { margin: 0 0 6px; }
-  #partial { color: var(--muted); font-style: italic; }
-  .card { border-radius: 8px; padding: 10px 12px; margin-bottom: 10px; border-left: 4px solid; }
-  .card.alert { background: var(--alert-bg); border-color: var(--alert); }
-  .card.suggest { background: var(--suggest-bg); border-color: var(--suggest); }
-  #note { padding: 4px 16px; font-size: 13px; color: var(--muted); min-height: 1.5em; }
-  .card .kind { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
-  .card.alert .kind { color: var(--alert); }
-  .card.suggest .kind { color: var(--suggest); }
-  .card .time { float: right; font-size: 12px; color: var(--muted); }
+  body { margin: 0; min-height: 100vh; color: var(--text); -webkit-font-smoothing: antialiased;
+         background: radial-gradient(80vmax 60vmax at 0% -20%, rgba(109, 40, 217, .35), transparent 60%),
+                     radial-gradient(70vmax 50vmax at 100% -10%, rgba(14, 116, 144, .35), transparent 60%), var(--bg);
+         font: 15px/1.55 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable Text", "Segoe UI", Roboto, sans-serif; }
+  header { display: flex; align-items: center; gap: 12px; padding: 14px 24px; border-bottom: 1px solid var(--line);
+           background: rgba(7, 8, 13, .55); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); }
+  .logo { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 18px; letter-spacing: -.02em; }
+  .logo span { width: 26px; height: 26px; border-radius: 8px; background: var(--brand); box-shadow: 0 4px 14px rgba(124, 92, 255, .55); }
+  #status { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--soft);
+            padding: 6px 12px; border-radius: 999px; background: rgba(255, 255, 255, .045); border: 1px solid var(--line); }
+  #status::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+  #status.listening::before { background: var(--green); box-shadow: 0 0 0 4px rgba(52, 211, 153, .15); }
+  #status.reconnecting::before, #status.offline::before { background: var(--amber); }
+  #note { padding: 6px 24px; font-size: 13px; color: var(--muted); min-height: 1.6em; }
+  main { display: grid; grid-template-columns: 3fr 2fr; gap: 16px; padding: 0 24px 24px; height: calc(100vh - 92px); }
+  section { display: flex; flex-direction: column; min-height: 0; border-radius: 20px; border: 1px solid var(--line);
+            background: linear-gradient(180deg, rgba(255, 255, 255, .06), rgba(255, 255, 255, .025)); backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px); box-shadow: 0 30px 80px -30px rgba(0, 0, 0, .7); overflow: hidden; }
+  h2 { font-size: 12.5px; text-transform: uppercase; letter-spacing: .08em; color: var(--soft); margin: 0; padding: 16px 20px 12px;
+       border-bottom: 1px solid var(--line); font-weight: 650; }
+  .scroll { flex: 1; overflow-y: auto; padding: 14px 20px 20px; }
+  #transcript p { display: flex; gap: 10px; align-items: flex-start; margin: 0 -10px; padding: 8px 10px; border-radius: 12px; animation: rise .4s var(--ease) both; }
+  #transcript p span:first-child { flex: 1; }
+  #transcript p.ok { background: linear-gradient(90deg, rgba(52, 211, 153, .07), transparent 70%); }
+  #transcript p.wrong { background: linear-gradient(90deg, rgba(255, 84, 112, .12), transparent 80%); }
+  .badge { flex: none; font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 999px; animation: pop .45s var(--spring) both; }
+  .badge.ok { color: var(--green); background: rgba(52, 211, 153, .12); }
+  .badge.bad { color: var(--red); background: rgba(255, 84, 112, .12); }
+  .badge.off { color: var(--muted); background: rgba(255, 255, 255, .05); }
+  #partial { color: var(--muted); margin: 8px 0 0; }
+  .card { position: relative; border-radius: 16px; padding: 12px 16px 12px 18px; margin-bottom: 12px; border: 1px solid var(--line);
+          overflow: hidden; animation: slide .6s var(--spring) both; }
+  .card::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; }
+  .card.alert { background: linear-gradient(135deg, rgba(255, 84, 112, .14), rgba(255, 84, 112, .03)); border-color: rgba(255, 84, 112, .28); }
+  .card.alert::before { background: var(--red); box-shadow: 0 0 18px var(--red); }
+  .card.suggest { background: linear-gradient(135deg, rgba(96, 165, 250, .13), rgba(96, 165, 250, .03)); border-color: rgba(96, 165, 250, .26); }
+  .card.suggest::before { background: var(--blue); box-shadow: 0 0 18px var(--blue); }
+  .card .kind { font-size: 11.5px; font-weight: 750; text-transform: uppercase; letter-spacing: .08em; margin-bottom: 4px; }
+  .card.alert .kind { color: var(--red); }
+  .card.suggest .kind { color: var(--blue); }
+  .card .time { float: right; font-size: 12px; color: var(--muted); font-weight: 500; letter-spacing: 0; }
   .empty { color: var(--muted); font-size: 14px; }
+  @keyframes rise { from { opacity: 0; transform: translateY(8px); } }
+  @keyframes slide { from { opacity: 0; transform: translateX(24px) scale(.97); } }
+  @keyframes pop { from { opacity: 0; transform: scale(.6); } }
   @media (max-width: 760px) {
-    main { grid-template-columns: 1fr; height: auto; }
+    main { grid-template-columns: 1fr; height: auto; padding: 0 16px 16px; }
+    header { padding: 12px 16px; } #note { padding: 6px 16px; }
     section { max-height: 60vh; }
     #alerts { order: -1; }  /* small window: alerts first, they matter most */
   }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; } }
 </style>
 </head>
 <body>
 <header>
-  <h1>PreCue</h1>
+  <div class="logo"><span></span>PreCue</div>
   <span id="status" class="offline">Connecting...</span>
 </header>
 <div id="note"></div>
 <main>
   <section>
     <h2>Live transcript</h2>
-    <div id="transcript"><p class="empty" id="waiting">Waiting for speech...</p></div>
-    <p id="partial"></p>
+    <div class="scroll" id="transcript-scroll">
+      <div id="transcript"><p class="empty" id="waiting">Waiting for speech...</p></div>
+      <p id="partial"></p>
+    </div>
   </section>
   <section id="alerts">
     <h2>Alerts and suggestions</h2>
-    <div id="cards"><p class="empty" id="no-cards">Nothing yet. PreCue stays quiet while you are right.</p></div>
+    <div class="scroll"><div id="cards"><p class="empty" id="no-cards">Nothing yet. PreCue stays quiet while you are right.</p></div></div>
   </section>
 </main>
 <script>
   const transcript = document.getElementById("transcript");
+  const scroller = document.getElementById("transcript-scroll");
   const partial = document.getElementById("partial");
   const cards = document.getElementById("cards");
   const status = document.getElementById("status");
   const note = document.getElementById("note");
   const LABELS = { alert: "Check this", suggest: "Next point" };
+  const VERDICTS = { correct: ["ok", "✓ Verified"], wrong: ["bad", "✕ Check this"], not_in_document: ["off", "Not in report"] };
 
   function removeEl(id) { const el = document.getElementById(id); if (el) el.remove(); }
 
   function addSentence(text) {
     removeEl("waiting");
     const p = document.createElement("p");
-    p.textContent = text;  // textContent, never innerHTML: speech text is never run as code
+    const said = document.createElement("span");
+    said.textContent = text;  // textContent, never innerHTML: speech text is never run as code
+    p.dataset.text = text;
+    p.append(said);
     transcript.appendChild(p);
     partial.textContent = "";
-    transcript.parentElement.scrollTop = transcript.parentElement.scrollHeight;
+    scroller.scrollTop = scroller.scrollHeight;
+  }
+
+  function markSentence(text, verdict) {
+    const look = VERDICTS[verdict];
+    const p = [...transcript.querySelectorAll("p")].reverse().find((x) => x.dataset.text === text && !x.dataset.verdict);
+    if (!p || !look) return;
+    p.dataset.verdict = verdict;
+    p.classList.add(look[0] === "ok" ? "ok" : look[0] === "bad" ? "wrong" : "none");
+    const badge = document.createElement("span");
+    badge.className = "badge " + look[0];
+    badge.textContent = look[1];
+    p.append(badge);
   }
 
   function addCard(event) {
@@ -115,6 +151,7 @@
     const event = JSON.parse(message.data);
     if (event.type === "final") addSentence(event.text);
     else if (event.type === "partial") partial.textContent = event.text;
+    else if (event.type === "verdict") markSentence(event.text, event.verdict);
     else if (event.type === "status") setStatus(event.text, event.state);
     else if (event.type in LABELS) addCard(event);
     else if (event.type === "skipped") note.textContent = event.time + "  " + event.text;  // minor: no card

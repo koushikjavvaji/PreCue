@@ -29,10 +29,16 @@ QUERY_PREFIX = "search_query: "
 class Embedder:
     def __init__(self, model_name=MODEL_NAME):
         try:
-            self.tokenizer = AutoTokenizer.from_pretrained(model_name)
-            self.model = AutoModel.from_pretrained(model_name)
-        except OSError as error:
-            raise PreCueError(f"Could not load the embedding model '{model_name}': {error}") from error
+            # The downloaded copy first: no network, ~1.5 s instead of 6-13 s (asking Hugging Face
+            # for updates). Only the very first time is the model downloaded.
+            self.tokenizer = AutoTokenizer.from_pretrained(model_name, local_files_only=True)
+            self.model = AutoModel.from_pretrained(model_name, local_files_only=True)
+        except OSError:
+            try:
+                self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+                self.model = AutoModel.from_pretrained(model_name)
+            except OSError as error:
+                raise PreCueError(f"Could not load the embedding model '{model_name}': {error}") from error
         self.model_name = model_name
         self.model.eval()  # we only use the model, we never train it
         self.embed_query("warm up")  # the first run is slow (~1 s); do it now, not on the first live question

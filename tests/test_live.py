@@ -15,7 +15,7 @@ from websockets.exceptions import ConnectionClosed
 
 import app.stt as stt
 import app.voice as voice
-import scripts.live_copilot as live
+import app.meeting as live
 from app.errors import ConnectionLostError, PreCueError
 from app.screen import LiveScreen
 

@@ -15,15 +15,31 @@ from app.llm import get_gemini, model_name
 from app.retriever import Retriever
 
 
-def prepare(path, mode="plain"):
-    """Return (retriever, facts) for the document at path. facts is a FactsTable."""
-    embedder = Embedder()
+def prepare(path, mode="plain", embedder=None, report=None):
+    """Return (retriever, facts) for the document at path. facts is a FactsTable.
+
+    embedder: a loaded Embedder, to skip loading the model again (the app loads it at start).
+    report(kind, text): called with ("step", "Reading the document") and ("warning", "...");
+    without it, steps are silent and warnings are printed.
+    """
+    report = report or _print_warnings
+    if embedder is None:
+        report("step", "Loading the search model")
+        embedder = Embedder()
+    report("step", "Reading and indexing the document")
     chunks, vectors = build_index(path, mode, embedder)
     retriever = Retriever(chunks, vectors, embedder)
     for section in suspicious_sections(chunks):
-        print(f"Warning: '{section}' has text that looks like instructions to an AI. "
-              "PreCue will not follow it, but check that the document was not tampered with.")
+        report("warning", f"'{section}' has text that looks like instructions to an AI. "
+               "PreCue will not follow it, but check that the document was not tampered with.")
 
+    report("step", "Building the facts table")
     gemini = get_gemini()
-    rows = extract_facts(chunks, load_text(path), gemini, model_name=model_name(gemini))
+    rows = extract_facts(chunks, load_text(path), gemini, model_name=model_name(gemini),
+                         on_progress=lambda done, total: report("progress", f"{done}/{total}"))
     return retriever, FactsTable(rows, embedder)
+
+
+def _print_warnings(kind, text):
+    if kind == "warning":
+        print(f"Warning: {text}")
