@@ -3,53 +3,52 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="color-scheme" content="dark">
+<meta name="color-scheme" content="light">
 <title>PreCue Live</title>
 <style>
   :root {
-    --bg: #07080d; --line: rgba(255, 255, 255, .08); --text: #f3f4f8; --soft: #b7bccb; --muted: #7d8396;
-    --brand: linear-gradient(135deg, #8b5cf6 0%, #6366f1 45%, #22d3ee 100%);
-    --red: #ff5470; --green: #34d399; --blue: #60a5fa; --amber: #fbbf24;
+    --bg: #faf9f5; --line: #e9e6dc; --text: #1f1e1d; --soft: #4d4b46; --muted: #8a877f;
+    --brand: linear-gradient(135deg, #e8916b 0%, #d97757 50%, #c4603c 100%);
+    --red: #dc2626; --green: #15803d; --blue: #1d4ed8; --amber: #b45309;
     --ease: cubic-bezier(.2, .8, .2, 1); --spring: cubic-bezier(.34, 1.56, .64, 1);
   }
   * { box-sizing: border-box; }
   body { margin: 0; min-height: 100vh; color: var(--text); -webkit-font-smoothing: antialiased;
-         background: radial-gradient(80vmax 60vmax at 0% -20%, rgba(109, 40, 217, .35), transparent 60%),
-                     radial-gradient(70vmax 50vmax at 100% -10%, rgba(14, 116, 144, .35), transparent 60%), var(--bg);
+         background: radial-gradient(80vmax 60vmax at 0% -20%, rgba(217, 119, 87, .14), transparent 60%),
+                     radial-gradient(70vmax 50vmax at 100% -10%, rgba(232, 145, 107, .12), transparent 60%), var(--bg);
          font: 15px/1.55 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable Text", "Segoe UI", Roboto, sans-serif; }
   header { display: flex; align-items: center; gap: 12px; padding: 14px 24px; border-bottom: 1px solid var(--line);
-           background: rgba(7, 8, 13, .55); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); }
+           background: rgba(250, 249, 245, .85); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); }
   .logo { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 18px; letter-spacing: -.02em; }
-  .logo span { width: 26px; height: 26px; border-radius: 8px; background: var(--brand); box-shadow: 0 4px 14px rgba(124, 92, 255, .55); }
+  .logo span { width: 26px; height: 26px; border-radius: 8px; background: var(--brand); }
   #status { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--soft);
-            padding: 6px 12px; border-radius: 999px; background: rgba(255, 255, 255, .045); border: 1px solid var(--line); }
+            padding: 6px 12px; border-radius: 999px; background: #fff; border: 1px solid var(--line); }
   #status::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
-  #status.listening::before { background: var(--green); box-shadow: 0 0 0 4px rgba(52, 211, 153, .15); }
+  #status.listening::before { background: var(--green); box-shadow: 0 0 0 4px rgba(21, 128, 61, .12); }
   #status.reconnecting::before, #status.offline::before { background: var(--amber); }
   #note { padding: 6px 24px; font-size: 13px; color: var(--muted); min-height: 1.6em; }
   main { display: grid; grid-template-columns: 3fr 2fr; gap: 16px; padding: 0 24px 24px; height: calc(100vh - 92px); }
   section { display: flex; flex-direction: column; min-height: 0; border-radius: 20px; border: 1px solid var(--line);
-            background: linear-gradient(180deg, rgba(255, 255, 255, .06), rgba(255, 255, 255, .025)); backdrop-filter: blur(24px);
-            -webkit-backdrop-filter: blur(24px); box-shadow: 0 30px 80px -30px rgba(0, 0, 0, .7); overflow: hidden; }
+            background: #fff; box-shadow: 0 1px 2px rgba(31, 30, 29, .04), 0 8px 28px -12px rgba(31, 30, 29, .14); overflow: hidden; }
   h2 { font-size: 12.5px; text-transform: uppercase; letter-spacing: .08em; color: var(--soft); margin: 0; padding: 16px 20px 12px;
        border-bottom: 1px solid var(--line); font-weight: 650; }
   .scroll { flex: 1; overflow-y: auto; padding: 14px 20px 20px; }
   #transcript p { display: flex; gap: 10px; align-items: flex-start; margin: 0 -10px; padding: 8px 10px; border-radius: 12px; animation: rise .4s var(--ease) both; }
   #transcript p span:first-child { flex: 1; }
-  #transcript p.ok { background: linear-gradient(90deg, rgba(52, 211, 153, .07), transparent 70%); }
-  #transcript p.wrong { background: linear-gradient(90deg, rgba(255, 84, 112, .12), transparent 80%); }
+  #transcript p.ok { background: linear-gradient(90deg, rgba(21, 128, 61, .06), transparent 70%); }
+  #transcript p.wrong { background: linear-gradient(90deg, rgba(220, 38, 38, .07), transparent 80%); }
   .badge { flex: none; font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 999px; animation: pop .45s var(--spring) both; }
-  .badge.ok { color: var(--green); background: rgba(52, 211, 153, .12); }
-  .badge.bad { color: var(--red); background: rgba(255, 84, 112, .12); }
-  .badge.off { color: var(--muted); background: rgba(255, 255, 255, .05); }
+  .badge.ok { color: var(--green); background: rgba(21, 128, 61, .09); }
+  .badge.bad { color: var(--red); background: rgba(220, 38, 38, .08); }
+  .badge.off { color: var(--muted); background: #f3f1ea; }
   #partial { color: var(--muted); margin: 8px 0 0; }
   .card { position: relative; border-radius: 16px; padding: 12px 16px 12px 18px; margin-bottom: 12px; border: 1px solid var(--line);
           overflow: hidden; animation: slide .6s var(--spring) both; }
   .card::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; }
-  .card.alert { background: linear-gradient(135deg, rgba(255, 84, 112, .14), rgba(255, 84, 112, .03)); border-color: rgba(255, 84, 112, .28); }
-  .card.alert::before { background: var(--red); box-shadow: 0 0 18px var(--red); }
-  .card.suggest { background: linear-gradient(135deg, rgba(96, 165, 250, .13), rgba(96, 165, 250, .03)); border-color: rgba(96, 165, 250, .26); }
-  .card.suggest::before { background: var(--blue); box-shadow: 0 0 18px var(--blue); }
+  .card.alert { background: linear-gradient(135deg, rgba(220, 38, 38, .08), rgba(220, 38, 38, .02)); border-color: rgba(220, 38, 38, .25); }
+  .card.alert::before { background: var(--red); }
+  .card.suggest { background: linear-gradient(135deg, rgba(29, 78, 216, .08), rgba(29, 78, 216, .02)); border-color: rgba(29, 78, 216, .22); }
+  .card.suggest::before { background: var(--blue); }
   .card .kind { font-size: 11.5px; font-weight: 750; text-transform: uppercase; letter-spacing: .08em; margin-bottom: 4px; }
   .card.alert .kind { color: var(--red); }
   .card.suggest .kind { color: var(--blue); }
