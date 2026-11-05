@@ -76,9 +76,11 @@ jobs:
             sleep 5
           done
           tail -20 launcher.log
-          echo "$state" | grep -q '"model_ready": true' || { echo "PreCue never got ready"; exit 1; }
-          echo "$state" | grep -q '"model_error": ""' || { echo "the search model failed: $state"; exit 1; }
-          curl -s http://127.0.0.1:8765/ | grep -q "<title>PreCue</title>" || { echo "the app page is missing"; exit 1; }
+          [[ "$state" == *'"model_ready": true'* ]] || { echo "PreCue never got ready"; exit 1; }
+          [[ "$state" == *'"model_error": ""'* ]] || { echo "the search model failed: $state"; exit 1; }
+          # Fetch first, then look: "curl | grep -q" can fail at random (grep stops reading, curl then errors)
+          page=$(curl -s http://127.0.0.1:8765/)
+          [[ "$page" == *"<title>PreCue</title>"* ]] || { echo "the app page is missing"; exit 1; }
           echo "PreCue installed itself and is ready"
 
   install:
@@ -109,7 +111,7 @@ jobs:
             sleep 5
           done
           tail -20 install.log
-          echo "$state" | grep -q '"model_ready": true' || { echo "PreCue never got ready"; exit 1; }
-          echo "$state" | grep -q '"model_error": ""' || { echo "the search model failed: $state"; exit 1; }
+          [[ "$state" == *'"model_ready": true'* ]] || { echo "PreCue never got ready"; exit 1; }
+          [[ "$state" == *'"model_error": ""'* ]] || { echo "the search model failed: $state"; exit 1; }
           test -f "$HOME/PreCue/PreCue.command" || { echo "PreCue was not installed in the home folder"; exit 1; }
           echo "The one-line install works"
