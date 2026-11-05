@@ -1,0 +1,383 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>PreCue · Never misquote a number again</title>
+<meta name="description" content="PreCue listens while you present, checks every number you say against your own report, and quietly corrects you in your earphones. Free and open source.">
+<meta property="og:title" content="PreCue · Never misquote a number again">
+<meta property="og:description" content="A private, real-time fact-checker for your meetings. Free and open source.">
+<meta property="og:type" content="website">
+<meta name="theme-color" content="#07080d">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%238b5cf6'/%3E%3Cstop offset='1' stop-color='%2322d3ee'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='9' fill='url(%23g)'/%3E%3Cg stroke='white' stroke-width='2.4' stroke-linecap='round'%3E%3Cpath d='M9 13v6M13 10v12M17 8v16M21 11.5v9'/%3E%3C/g%3E%3C/svg%3E">
+<style>
+  :root {
+    --bg: #07080d; --text: #f3f4f8; --soft: #b7bccb; --muted: #7d8396; --line: rgba(255,255,255,.08); --line-2: rgba(255,255,255,.14);
+    --brand: linear-gradient(135deg, #8b5cf6 0%, #6366f1 45%, #22d3ee 100%);
+    --red: #ff5470; --green: #34d399; --blue: #60a5fa; --amber: #fbbf24;
+    --ease: cubic-bezier(.2,.8,.2,1); --spring: cubic-bezier(.34,1.56,.64,1);
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body { margin: 0; background: var(--bg); color: var(--text); overflow-x: hidden; -webkit-font-smoothing: antialiased;
+         font: 16px/1.6 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable Text", "Segoe UI", Inter, Roboto, sans-serif; }
+  a { color: inherit; }
+  ::selection { background: rgba(139,92,246,.45); }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 0 24px; }
+
+  .sky { position: absolute; inset: 0 0 auto 0; height: 1100px; z-index: -1; overflow: hidden; pointer-events: none; }
+  .sky::after { content: ""; position: absolute; inset: 0; background-image: radial-gradient(rgba(255,255,255,.06) 1px, transparent 1px);
+                background-size: 28px 28px; mask-image: radial-gradient(ellipse at 50% 0%, #000, transparent 70%); -webkit-mask-image: radial-gradient(ellipse at 50% 0%, #000, transparent 70%); }
+  /* soft colour glows: plain gradients (no blur filter), cheap to draw on any computer */
+  .glow { position: absolute; inset: -10% -10% 0 -10%; animation: drift 24s var(--ease) infinite alternate;
+          background: radial-gradient(42% 55% at 12% 8%, rgba(109,40,217,.42), transparent 70%),
+                      radial-gradient(40% 50% at 92% 4%, rgba(14,116,144,.42), transparent 70%); }
+  @keyframes drift { to { transform: translate(3%, 2%) scale(1.06); } }
+
+  nav { position: sticky; top: 0; z-index: 30; backdrop-filter: blur(18px) saturate(140%); -webkit-backdrop-filter: blur(18px) saturate(140%);
+        background: rgba(7,8,13,.6); border-bottom: 1px solid var(--line); }
+  nav .wrap { display: flex; align-items: center; gap: 28px; height: 64px; }
+  .logo { display: flex; align-items: center; gap: 10px; font-weight: 750; font-size: 18px; letter-spacing: -.02em; text-decoration: none; }
+  .logo svg { width: 30px; height: 30px; filter: drop-shadow(0 4px 14px rgba(124,92,255,.55)); }
+  nav .links { display: flex; gap: 24px; margin-left: auto; font-size: 14.5px; }
+  nav .links a { color: var(--soft); text-decoration: none; transition: color .2s; } nav .links a:hover { color: var(--text); }
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 10px; padding: 12px 20px; border-radius: 14px; font-weight: 650;
+         text-decoration: none; transition: transform .25s var(--spring), box-shadow .25s, background .2s, border-color .2s; white-space: nowrap; }
+  .btn.primary { color: #fff; background: var(--brand); box-shadow: 0 14px 40px -12px rgba(124,92,255,.8), 0 1px 0 rgba(255,255,255,.35) inset; }
+  .btn.primary:hover { transform: translateY(-2px); box-shadow: 0 22px 50px -14px rgba(124,92,255,.95); }
+  .btn.ghost { color: var(--soft); background: rgba(255,255,255,.05); border: 1px solid var(--line-2); }
+  .btn.ghost:hover { color: var(--text); background: rgba(255,255,255,.09); }
+  .btn.small { padding: 8px 14px; border-radius: 11px; font-size: 14px; }
+  .btn svg { width: 18px; height: 18px; }
+
+  /* ---------- hero ---------- */
+  .hero { display: grid; grid-template-columns: 1fr 1.05fr; gap: 56px; align-items: center; padding: 84px 0 70px; }
+  .eyebrow { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: #c4b5fd; padding: 6px 12px 6px 8px;
+             border-radius: 999px; background: rgba(139,92,246,.1); border: 1px solid rgba(139,92,246,.25); }
+  .eyebrow b { background: var(--brand); color: #fff; border-radius: 999px; padding: 1px 8px; font-size: 11px; }
+  h1 { font-size: clamp(42px, 6.2vw, 76px); line-height: 1; letter-spacing: -.05em; margin: 20px 0 20px; font-weight: 780; }
+  .grad { background: var(--brand); -webkit-background-clip: text; background-clip: text; color: transparent; background-size: 200% 200%; animation: shimmer 8s ease-in-out infinite; }
+  @keyframes shimmer { 50% { background-position: 100% 50%; } }
+  .lead { font-size: clamp(17px, 1.6vw, 20px); color: var(--soft); max-width: 540px; margin: 0 0 32px; }
+  .ctas { display: flex; gap: 12px; flex-wrap: wrap; }
+  .fine { color: var(--muted); font-size: 13.5px; margin-top: 16px; }
+
+  /* the meeting mock */
+  .mock { position: relative; border-radius: 22px; border: 1px solid var(--line-2); overflow: hidden; aspect-ratio: 16 / 11;
+          background: linear-gradient(160deg, #151a2b, #0b0d16); box-shadow: 0 50px 120px -40px rgba(0,0,0,.9), 0 0 0 1px rgba(255,255,255,.03) inset; }
+  .mock .top { display: flex; align-items: center; gap: 7px; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+  .mock .top i { width: 11px; height: 11px; border-radius: 50%; background: #2a3045; } .mock .top i:nth-child(1) { background: #ff5f57; } .mock .top i:nth-child(2) { background: #febc2e; } .mock .top i:nth-child(3) { background: #28c840; }
+  .mock .top span { margin-left: 10px; font-size: 12px; color: var(--muted); }
+  .mock .rec { margin-left: auto; display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: #fca5a5; }
+  .mock .rec::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--red); animation: blink 1.4s infinite; }
+  @keyframes blink { 50% { opacity: .3; } }
+  .mock .slide { position: absolute; left: 6%; top: 15%; width: 58%; height: 56%; border-radius: 12px; background: #f4f5f9; padding: 5% 6%; color: #1d2330; }
+  .mock .slide h4 { margin: 0 0 8%; font-size: clamp(11px, 1.3vw, 16px); letter-spacing: -.01em; }
+  .mock .bars { position: absolute; left: 8%; right: 30%; top: 30%; bottom: 34%; display: flex; align-items: flex-end; gap: 7%; }
+  .mock .bars span { flex: 1; border-radius: 4px 4px 0 0; background: linear-gradient(#6366f1, #8b5cf6); animation: grow 1.2s var(--ease) both; }
+  @keyframes grow { from { transform: scaleY(0); transform-origin: bottom; } }
+  .mock .people { position: absolute; left: 6%; right: 6%; bottom: 6%; display: flex; gap: 2.5%; }
+  .mock .person { flex: 1; aspect-ratio: 16 / 10; border-radius: 10px; background: linear-gradient(135deg, #283048, #1a1f30); border: 1px solid var(--line); position: relative; }
+  .mock .person.you { border-color: rgba(52,211,153,.7); box-shadow: 0 0 0 2px rgba(52,211,153,.25); }
+  .mock .person::after { content: ""; position: absolute; left: 50%; top: 50%; width: 26%; aspect-ratio: 1; border-radius: 50%; transform: translate(-50%, -60%); background: rgba(255,255,255,.12); }
+  .mock .caption { position: absolute; left: 6%; bottom: 33%; right: 34%; font-size: clamp(11px, 1.15vw, 14px); padding: 8px 12px; border-radius: 10px;
+                   background: rgba(0,0,0,.55); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); opacity: 0; transition: opacity .4s; }
+  .mock .caption.on { opacity: 1; } .mock .caption em { font-style: normal; color: #fca5a5; font-weight: 650; }
+  .mock .pops { position: absolute; top: 15%; right: 3.5%; width: 33%; }
+  .pop { color: #fff; border-radius: 13px; padding: 10px 12px; font-size: clamp(10.5px, 1.05vw, 13px); line-height: 1.38; margin-bottom: 8px; position: relative; overflow: hidden;
+         box-shadow: 0 14px 30px -8px rgba(0,0,0,.7), 0 0 0 1px rgba(255,255,255,.14) inset; animation: slidein .6s var(--spring) both; }
+  .pop .k { font-size: .78em; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; opacity: .85; }
+  .pop.alert { background: rgb(176,32,32); } .pop.suggest { background: rgb(29,84,170); }
+  .pop.leave { animation: leave .5s ease forwards; }
+  .pop::after { content: ""; position: absolute; left: 0; bottom: 0; height: 3px; width: 100%; background: rgba(255,255,255,.45); transform-origin: left; animation: shrink 3.4s linear forwards; }
+  @keyframes slidein { from { opacity: 0; transform: translateX(30px) scale(.95); } }
+  @keyframes leave { to { opacity: 0; transform: translateX(12px); } }
+  @keyframes shrink { to { transform: scaleX(0); } }
+  .ear { position: absolute; right: 3.5%; bottom: 33%; display: flex; align-items: center; gap: 8px; padding: 7px 12px; border-radius: 999px; font-size: clamp(10px, 1vw, 12.5px);
+         background: rgba(139,92,246,.18); border: 1px solid rgba(139,92,246,.4); color: #ddd6fe; opacity: 0; transform: translateY(8px); transition: all .5s var(--spring); }
+  .ear.on { opacity: 1; transform: none; }
+  .ear .wave { display: flex; gap: 2px; align-items: center; height: 14px; }
+  .ear .wave i { width: 2.5px; border-radius: 2px; background: #c4b5fd; animation: talk .9s ease-in-out infinite; }
+  .ear .wave i:nth-child(2) { animation-delay: -.2s; } .ear .wave i:nth-child(3) { animation-delay: -.4s; } .ear .wave i:nth-child(4) { animation-delay: -.6s; }
+  @keyframes talk { 0%, 100% { height: 4px; } 50% { height: 14px; } }
+  .only { position: absolute; left: 50%; bottom: -1px; transform: translate(-50%, 0); font-size: 11.5px; color: var(--muted); padding: 5px 12px; border-radius: 10px 10px 0 0;
+          background: rgba(7,8,13,.8); border: 1px solid var(--line); border-bottom: 0; white-space: nowrap; }
+
+  .strip { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px 34px; padding: 22px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); color: var(--soft); font-size: 14.5px; }
+  .strip span { display: inline-flex; align-items: center; gap: 8px; }
+  .strip svg { width: 18px; height: 18px; color: var(--green); }
+
+  section.block { padding: 100px 0 10px; }
+  .kicker { font-size: 13px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: #a5b4fc; }
+  h2 { font-size: clamp(30px, 3.8vw, 46px); line-height: 1.08; letter-spacing: -.035em; margin: 12px 0 14px; font-weight: 750; }
+  .intro { color: var(--soft); font-size: 18px; max-width: 640px; margin: 0 0 44px; }
+  .card { border-radius: 22px; border: 1px solid var(--line); background: linear-gradient(180deg, rgba(255,255,255,.055), rgba(255,255,255,.02)); padding: 26px;
+          transition: transform .35s var(--spring), border-color .3s, background .3s; }
+  .card:hover { transform: translateY(-4px); border-color: var(--line-2); background: linear-gradient(180deg, rgba(255,255,255,.075), rgba(255,255,255,.03)); }
+  .card h3 { margin: 16px 0 8px; font-size: 19px; letter-spacing: -.015em; }
+  .card p { margin: 0; color: var(--soft); font-size: 15px; }
+  .icon { width: 46px; height: 46px; border-radius: 14px; display: grid; place-items: center; }
+  .icon svg { width: 24px; height: 24px; }
+  .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; counter-reset: step; }
+  .steps .card { position: relative; }
+  .steps .card::before { counter-increment: step; content: "0" counter(step); position: absolute; right: 24px; top: 20px; font-size: 44px; font-weight: 800;
+                         letter-spacing: -.04em; color: rgba(255,255,255,.05); }
+  .steps .time { display: inline-block; margin-top: 14px; font-size: 12.5px; color: var(--muted); padding: 4px 10px; border-radius: 999px; border: 1px solid var(--line); }
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+  .example { margin-top: 14px; font-size: 13.5px; color: var(--muted); padding-left: 12px; border-left: 2px solid var(--line-2); }
+  .example b { color: var(--soft); font-weight: 600; }
+
+  .numbers { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; }
+  .number { text-align: left; }
+  .number b { display: block; font-size: clamp(36px, 4vw, 52px); letter-spacing: -.04em; line-height: 1.05; font-variant-numeric: tabular-nums; }
+  .number b.g { background: var(--brand); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .number span { color: var(--soft); font-size: 15px; }
+  .note { color: var(--muted); font-size: 13.5px; margin-top: 22px; max-width: 760px; }
+
+  .privacy { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  .flow { display: grid; gap: 12px; }
+  .flow div { display: flex; gap: 14px; align-items: flex-start; padding: 14px 16px; border-radius: 16px; background: rgba(255,255,255,.03); border: 1px solid var(--line); }
+  .flow b { display: block; font-size: 15px; } .flow small { color: var(--muted); font-size: 13.5px; }
+  .flow .dot { flex: none; width: 10px; height: 10px; border-radius: 50%; margin-top: 7px; }
+
+  .get { display: grid; grid-template-columns: 1.1fr 1fr; gap: 18px; align-items: stretch; }
+  .get ol { margin: 0; padding: 0; list-style: none; counter-reset: s; display: grid; gap: 16px; }
+  .get li { position: relative; padding-left: 48px; color: var(--soft); }
+  .get li::before { counter-increment: s; content: counter(s); position: absolute; left: 0; top: -2px; width: 32px; height: 32px; border-radius: 10px; display: grid; place-items: center;
+                    font-weight: 750; color: #fff; background: var(--brand); box-shadow: 0 8px 20px -8px rgba(124,92,255,.8); }
+  .get li b { color: var(--text); display: block; }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .88em; padding: 2px 7px; border-radius: 7px; background: rgba(255,255,255,.07); border: 1px solid var(--line); color: #e0e7ff; }
+  .keys { display: grid; gap: 10px; }
+  .key { display: flex; align-items: center; gap: 14px; padding: 14px 16px; border-radius: 16px; background: rgba(255,255,255,.03); border: 1px solid var(--line); text-decoration: none; transition: all .25s var(--ease); }
+  .key:hover { border-color: var(--line-2); background: rgba(255,255,255,.06); transform: translateX(3px); }
+  .key .av { width: 38px; height: 38px; border-radius: 11px; display: grid; place-items: center; font-weight: 800; color: #fff; flex: none; }
+  .key b { display: block; font-size: 15px; } .key small { color: var(--muted); font-size: 13px; }
+  .key .arrow { margin-left: auto; color: var(--muted); }
+
+  details { border-bottom: 1px solid var(--line); padding: 18px 2px; }
+  summary { cursor: pointer; font-weight: 600; font-size: 17px; list-style: none; display: flex; justify-content: space-between; gap: 16px; }
+  summary::-webkit-details-marker { display: none; }
+  summary::after { content: "+"; color: var(--muted); font-size: 22px; line-height: 1; transition: transform .3s var(--spring); }
+  details[open] summary::after { transform: rotate(45deg); }
+  details p { color: var(--soft); margin: 12px 0 0; max-width: 820px; }
+
+  .final { margin: 110px 0 0; padding: 64px 32px; text-align: center; border-radius: 28px; position: relative; overflow: hidden;
+           background: radial-gradient(60% 120% at 50% 0%, rgba(139,92,246,.35), transparent 70%), linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.02)); border: 1px solid var(--line-2); }
+  .final h2 { margin-top: 0; }
+  footer { padding: 50px 0 60px; color: var(--muted); font-size: 14px; display: flex; gap: 20px; flex-wrap: wrap; align-items: center; }
+  footer a { color: var(--soft); text-decoration: none; } footer a:hover { color: var(--text); }
+
+  .reveal { opacity: 0; transform: translateY(24px); transition: opacity .8s var(--ease), transform .8s var(--ease); }
+  .reveal.seen { opacity: 1; transform: none; }
+
+  @media (max-width: 960px) {
+    .hero, .get, .privacy { grid-template-columns: 1fr; }
+    .hero { padding-top: 56px; gap: 40px; }
+    .steps, .grid { grid-template-columns: 1fr; }
+    .numbers { grid-template-columns: repeat(2, 1fr); }
+    nav .links { display: none; }
+    nav .btn { margin-left: auto; }
+  }
+  @media (max-width: 520px) { .wrap { padding: 0 16px; } .mock .caption { right: 6%; bottom: 36%; } .mock .pops { width: 46%; } .ear { display: none; } }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; } .reveal { opacity: 1; transform: none; } }
+</style>
+</head>
+<body>
+<div class="sky"><div class="glow"></div></div>
+
+<nav>
+  <div class="wrap">
+    <a class="logo" href="#">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8b5cf6"/><stop offset=".5" stop-color="#6366f1"/><stop offset="1" stop-color="#22d3ee"/></linearGradient></defs>
+        <rect width="32" height="32" rx="9" fill="url(#lg)"/><g stroke="#fff" stroke-width="2.4" stroke-linecap="round"><path d="M9 13v6"/><path d="M13 10v12"/><path d="M17 8v16"/><path d="M21 11.5v9"/></g><circle cx="24.5" cy="16" r="1.6" fill="#fff"/></svg>
+      PreCue</a>
+    <div class="links"><a href="#how">How it works</a><a href="#accuracy">Accuracy</a><a href="#privacy">Privacy</a><a href="#faq">FAQ</a></div>
+    <a class="btn primary small" href="#get">Get PreCue free</a>
+  </div>
+</nav>
+
+<header class="wrap hero">
+  <div>
+    <span class="eyebrow"><b>FREE</b> Open source · macOS and Windows</span>
+    <h1>Never misquote a number <span class="grad">again.</span></h1>
+    <p class="lead">PreCue listens while you present, checks every number you say against your own report, and quietly whispers the right one in your ear, before anyone notices.</p>
+    <div class="ctas">
+      <a class="btn primary" href="#get"><svg viewBox="0 0 24 24" fill="none"><path d="M12 4v11m0 0 4-4m-4 4-4-4M5 19h14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Download free</a>
+      <a class="btn ghost" href="https://github.com/koushikjavvaji/PreCue"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 0 0-3.2 19.5c.5.1.7-.2.7-.5v-1.7c-2.8.6-3.4-1.3-3.4-1.3-.4-1.2-1.1-1.5-1.1-1.5-.9-.6.1-.6.1-.6 1 .1 1.5 1 1.5 1 .9 1.6 2.4 1.1 3 .9.1-.7.4-1.1.6-1.4-2.2-.3-4.6-1.1-4.6-5a3.9 3.9 0 0 1 1-2.7 3.6 3.6 0 0 1 .1-2.7s.8-.3 2.8 1a9.6 9.6 0 0 1 5 0c1.9-1.3 2.8-1 2.8-1 .5 1.4.2 2.4.1 2.7a3.9 3.9 0 0 1 1 2.7c0 3.9-2.4 4.7-4.6 5 .4.3.7.9.7 1.9V21c0 .3.2.6.7.5A10 10 0 0 0 12 2Z"/></svg>View on GitHub</a>
+    </div>
+    <p class="fine">No account. No subscription. Uses free keys you create in a minute.</p>
+  </div>
+
+  <div class="mock" aria-label="A video call where PreCue shows a private correction">
+    <div class="top"><i></i><i></i><i></i><span>Q2 Business Review</span><span class="rec">Sharing screen</span></div>
+    <div class="slide"><h4>Q2 Revenue · ₹148.6 crore</h4><div class="bars"><span style="height:46%"></span><span style="height:58%;animation-delay:.1s"></span><span style="height:72%;animation-delay:.2s"></span><span style="height:100%;animation-delay:.3s"></span></div></div>
+    <div class="caption" id="caption"></div>
+    <div class="pops" id="pops"></div>
+    <div class="ear" id="ear"><span class="wave"><i></i><i></i><i></i><i></i></span><span id="ear-text"></span></div>
+    <div class="people"><div class="person you"></div><div class="person"></div><div class="person"></div><div class="person"></div></div>
+    <div class="only">The red card is only on your screen, never in the share</div>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="strip">
+    <span><svg viewBox="0 0 24 24" fill="none"><path d="m5 12.5 4.5 4.5L19 7.5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>Works with Zoom, Google Meet and Teams</span>
+    <span><svg viewBox="0 0 24 24" fill="none"><path d="m5 12.5 4.5 4.5L19 7.5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>Hidden from screen sharing</span>
+    <span><svg viewBox="0 0 24 24" fill="none"><path d="m5 12.5 4.5 4.5L19 7.5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>PDF, Word, PowerPoint, text</span>
+    <span><svg viewBox="0 0 24 24" fill="none"><path d="m5 12.5 4.5 4.5L19 7.5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>Checks in about 2 seconds</span>
+  </div>
+
+  <section class="block" id="how">
+    <div class="kicker reveal">How it works</div>
+    <h2 class="reveal">Present as usual. PreCue has your back.</h2>
+    <p class="intro reveal">Before the meeting, PreCue reads your report once and lists every number in it. During the meeting, it does three things, again and again.</p>
+    <div class="steps">
+      <div class="card reveal">
+        <div class="icon" style="background:rgba(139,92,246,.14)"><svg viewBox="0 0 24 24" fill="none"><rect x="9" y="3" width="6" height="11" rx="3" stroke="#a78bfa" stroke-width="2"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3" stroke="#a78bfa" stroke-width="2" stroke-linecap="round"/></svg></div>
+        <h3>Listens</h3><p>Turns your words into text as you speak, including numbers said as words ("ninety-six", "two point four million").</p>
+        <span class="time">live</span>
+      </div>
+      <div class="card reveal">
+        <div class="icon" style="background:rgba(34,211,238,.12)"><svg viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="6.5" stroke="#22d3ee" stroke-width="2"/><path d="m16 16 4.5 4.5M8.5 11l1.8 1.8 3.4-3.6" stroke="#22d3ee" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <h3>Checks</h3><p>Finds the right part of your report and compares the number: same metric, same period, same direction, any unit.</p>
+        <span class="time">about 2 seconds</span>
+      </div>
+      <div class="card reveal">
+        <div class="icon" style="background:rgba(255,84,112,.12)"><svg viewBox="0 0 24 24" fill="none"><path d="M4 14v-3a8 8 0 0 1 16 0v3" stroke="#ff8fa3" stroke-width="2" stroke-linecap="round"/><rect x="3" y="13" width="4.5" height="7" rx="2" stroke="#ff8fa3" stroke-width="2"/><rect x="16.5" y="13" width="4.5" height="7" rx="2" stroke="#ff8fa3" stroke-width="2"/></svg></div>
+        <h3>Whispers</h3><p>If you got it wrong, a private pop-up shows the right number and a voice says it in your earphones. Once per mistake.</p>
+        <span class="time">only when wrong</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="block">
+    <div class="kicker reveal">Built for real meetings</div>
+    <h2 class="reveal">Smart about numbers. Silent when you are right.</h2>
+    <p class="intro reveal">A wrong alert in a meeting is worse than none, so PreCue only speaks up when it is sure.</p>
+    <div class="grid">
+      <div class="card reveal"><div class="icon" style="background:rgba(52,211,153,.12)"><svg viewBox="0 0 24 24" fill="none"><path d="M7 7h10M7 12h10M7 17h6" stroke="#34d399" stroke-width="2" stroke-linecap="round"/></svg></div>
+        <h3>Understands units</h3><p>Lakh, crore, million, percent. The same amount said another way is not a mistake.</p><div class="example"><b>"24 lakh packs"</b> = 2.4 million in the report ✓</div></div>
+      <div class="card reveal"><div class="icon" style="background:rgba(251,191,36,.12)"><svg viewBox="0 0 24 24" fill="none"><rect x="4" y="5" width="16" height="15" rx="3" stroke="#fbbf24" stroke-width="2"/><path d="M4 10h16M9 3v4M15 3v4" stroke="#fbbf24" stroke-width="2" stroke-linecap="round"/></svg></div>
+        <h3>Knows the period</h3><p>This quarter, last quarter, a target. Last quarter's number said as this quarter's is caught.</p><div class="example"><b>"Margin this quarter was 36.9%"</b> → it was 38.5%</div></div>
+      <div class="card reveal"><div class="icon" style="background:rgba(96,165,250,.12)"><svg viewBox="0 0 24 24" fill="none"><path d="m4 16 5-5 4 4 7-7M15 8h5v5" stroke="#60a5fa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <h3>Checks the direction</h3><p>The right number with the wrong story is still wrong.</p><div class="example"><b>"Attrition rose to 14.5%"</b> → it went down, not up</div></div>
+      <div class="card reveal"><div class="icon" style="background:rgba(139,92,246,.14)"><svg viewBox="0 0 24 24" fill="none"><path d="M5 12h14M13 6l6 6-6 6" stroke="#a78bfa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <h3>Suggests what is next</h3><p>Pause for a few seconds and PreCue points to a section of your report you have not covered yet.</p></div>
+      <div class="card reveal"><div class="icon" style="background:rgba(255,84,112,.12)"><svg viewBox="0 0 24 24" fill="none"><path d="M12 3 5 6v5.5c0 4.4 3 8.2 7 9.5 4-1.3 7-5.1 7-9.5V6l-7-3Z" stroke="#ff8fa3" stroke-width="2" stroke-linejoin="round"/></svg></div>
+        <h3>Safe with any file</h3><p>Hidden instructions inside a document cannot change its alerts, and PreCue warns you when a file has them.</p></div>
+      <div class="card reveal"><div class="icon" style="background:rgba(34,211,238,.12)"><svg viewBox="0 0 24 24" fill="none"><path d="M13 3 5 14h6l-1 7 8-11h-6l1-7Z" stroke="#22d3ee" stroke-width="2" stroke-linejoin="round"/></svg></div>
+        <h3>Fast</h3><p>Ready in seconds for a report it has seen before. Searching a 700-part report takes about 70 milliseconds.</p></div>
+    </div>
+  </section>
+
+  <section class="block" id="accuracy">
+    <div class="kicker reveal">Accuracy</div>
+    <h2 class="reveal">Measured, not promised.</h2>
+    <p class="intro reveal">We test PreCue on a hard set of 111 spoken claims about a test report: tricky units, rounding, periods, directions and numbers said as words.</p>
+    <div class="numbers">
+      <div class="number reveal"><b class="g">0</b><span>false alerts in 69 correct claims</span></div>
+      <div class="number reveal"><b>109<small style="font-size:.45em;color:var(--muted)">/111</small></b><span>claims judged right</span></div>
+      <div class="number reveal"><b>40<small style="font-size:.45em;color:var(--muted)">/42</small></b><span>wrong claims caught</span></div>
+      <div class="number reveal"><b>10<small style="font-size:.45em;color:var(--muted)">/10</small></b><span>right on a booby-trapped report</span></div>
+    </div>
+    <p class="note reveal">Measured on fictional test reports, with Gemini as the checking model. The test sets and the script that scores them are in the repository, so you can run them yourself. When PreCue is unsure, it stays silent: a missed check, never a false alarm.</p>
+  </section>
+
+  <section class="block" id="privacy">
+    <div class="kicker reveal">Privacy</div>
+    <h2 class="reveal">No PreCue server. Nothing comes to us.</h2>
+    <p class="intro reveal">PreCue runs on your computer. It uses three AI services with keys that you create and own, so you can see exactly where your data goes.</p>
+    <div class="privacy">
+      <div class="flow reveal">
+        <div><span class="dot" style="background:#13ef93"></span><span><b>Your voice → Deepgram</b><small>To turn speech into text, and to speak the whisper.</small></span></div>
+        <div><span class="dot" style="background:#4285f4"></span><span><b>Your report → Gemini, once</b><small>To list the numbers in it before the meeting. Cached on your computer after that.</small></span></div>
+        <div><span class="dot" style="background:#f55036"></span><span><b>One sentence and the matching part → Groq</b><small>To check a claim. Only when you say a number.</small></span></div>
+      </div>
+      <div class="card reveal" style="display:grid;gap:12px;align-content:start">
+        <h3 style="margin:0">What stays on your computer</h3>
+        <p>Your keys (in a file only your user account can read), your reports, the search index and the transcript. The pop-up is hidden from screen sharing, so the people in your meeting see your slides, not your corrections.</p>
+        <p style="color:var(--muted);font-size:14px">Use your own judgement for confidential documents: they are processed by the AI services above under their terms.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="block" id="get">
+    <div class="kicker reveal">Get started</div>
+    <h2 class="reveal">Ready in five minutes. Free forever.</h2>
+    <p class="intro reveal">You need a Mac or a Windows PC, <a href="https://www.python.org/downloads/">Python 3.11 or newer</a>, and earphones.</p>
+    <div class="get">
+      <div class="card reveal">
+        <ol>
+          <li><b>Download PreCue</b>Get the <a href="https://github.com/koushikjavvaji/PreCue/archive/refs/heads/main.zip">ZIP file</a> and unzip it.</li>
+          <li><b>Double-click to start</b><code>PreCue.command</code> on a Mac (the first time: right-click it and choose Open), or <code>PreCue.bat</code> on Windows. The first start sets itself up in a few minutes; after that it opens in seconds.</li>
+          <li><b>Add your three free keys</b>The PreCue page opens in your browser. Paste each key once; PreCue tests them for you.</li>
+          <li><b>Drop in your report and press Start</b>Then join your call as usual.</li>
+        </ol>
+        <div class="ctas" style="margin-top:26px"><a class="btn primary" href="https://github.com/koushikjavvaji/PreCue/archive/refs/heads/main.zip"><svg viewBox="0 0 24 24" fill="none"><path d="M12 4v11m0 0 4-4m-4 4-4-4M5 19h14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Download ZIP</a></div>
+      </div>
+      <div class="keys reveal">
+        <a class="key" href="https://console.deepgram.com/signup"><span class="av" style="background:linear-gradient(135deg,#13ef93,#149afb)">D</span><span><b>Deepgram</b><small>Hears you and whispers back · free credit</small></span><span class="arrow">↗</span></a>
+        <a class="key" href="https://aistudio.google.com/apikey"><span class="av" style="background:linear-gradient(135deg,#4285f4,#a142f4)">G</span><span><b>Gemini</b><small>Reads your report before the meeting · free tier</small></span><span class="arrow">↗</span></a>
+        <a class="key" href="https://console.groq.com/keys"><span class="av" style="background:linear-gradient(135deg,#f55036,#ff9e3d)">G</span><span><b>Groq</b><small>Checks your numbers live · free tier</small></span><span class="arrow">↗</span></a>
+        <p class="note" style="margin:6px 4px 0">No credit card needed for any of them. The free tiers allow about 300 checks a day, plenty for several meetings.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="block" id="faq">
+    <div class="kicker reveal">FAQ</div>
+    <h2 class="reveal">Questions</h2>
+    <details><summary>Can the people in my meeting see or hear PreCue?</summary><p>No. On macOS and Windows the pop-up is left out of screen sharing and screenshots, and whispers go to your earphones. On laptop speakers others might hear the whisper, so PreCue warns you to use earphones.</p></details>
+    <details><summary>Does it work with Zoom, Google Meet and Microsoft Teams?</summary><p>Yes. PreCue does not connect to the meeting app at all: it listens to your microphone and shows its pop-up on top of whatever is on your screen, including full-screen slides.</p></details>
+    <details><summary>Is it really free?</summary><p>Yes. PreCue is open source, and the three AI services have free tiers that are enough for several meetings a day. There is no PreCue account or subscription.</p></details>
+    <details><summary>What if I say a number that is not in my report?</summary><p>PreCue stays silent. It only corrects you when your report clearly gives a different value for the same thing and the same period.</p></details>
+    <details><summary>Which languages does it understand?</summary><p>English, including Indian number words like lakh and crore. Your report can be a PDF, Word, PowerPoint, text or Markdown file.</p></details>
+    <details><summary>What happens if my internet drops?</summary><p>PreCue reconnects by itself, and the meeting goes on. A check that would arrive too late is skipped rather than shown out of context.</p></details>
+  </section>
+
+  <div class="final reveal">
+    <h2>Present with confidence.</h2>
+    <p class="intro" style="margin:0 auto 30px">Your numbers, checked in real time. Only you will know.</p>
+    <div class="ctas" style="justify-content:center"><a class="btn primary" href="#get">Get PreCue free</a><a class="btn ghost" href="https://github.com/koushikjavvaji/PreCue">Star on GitHub</a></div>
+  </div>
+
+  <footer>
+    <a class="logo" href="#" style="font-size:15px"><svg viewBox="0 0 32 32" style="width:22px;height:22px" aria-hidden="true"><rect width="32" height="32" rx="9" fill="url(#lg)"/><g stroke="#fff" stroke-width="2.4" stroke-linecap="round"><path d="M9 13v6"/><path d="M13 10v12"/><path d="M17 8v16"/><path d="M21 11.5v9"/></g></svg>PreCue</a>
+    <span>Open source · Made for people who present numbers</span>
+    <span style="margin-left:auto"><a href="https://github.com/koushikjavvaji/PreCue">GitHub</a> · <a href="https://github.com/koushikjavvaji/PreCue/blob/main/SECURITY.md">Security</a></span>
+  </footer>
+</div>
+
+<script>
+  // The meeting demo: what you say appears as a caption, then PreCue's private card and whisper.
+  const SCENES = [
+    { say: "Revenue this quarter was 148.6 crore.", wrong: "", pop: null, ear: "" },
+    { say: "And we now reach ", wrong: "2.2 lakh", rest: " retail outlets.", pop: ["alert", "Check this", "You said 2.2 lakh, the document says 1.85 lakh (Distribution)."], ear: "1.85 lakh, not 2.2 lakh." },
+    { say: "So, um...", wrong: "", pop: ["suggest", "Next point", "Operations: capacity utilization rose to 78%."], ear: "" },
+  ];
+  const caption = document.getElementById("caption"), pops = document.getElementById("pops"), ear = document.getElementById("ear");
+  let scene = 0;
+  function play() {
+    const s = SCENES[scene++ % SCENES.length];
+    caption.replaceChildren(document.createTextNode(s.say));
+    if (s.wrong) { const em = document.createElement("em"); em.textContent = s.wrong; caption.append(em, document.createTextNode(s.rest)); }
+    caption.classList.add("on");
+    for (const old of [...pops.children]) { old.classList.add("leave"); setTimeout(() => old.remove(), 450); }
+    ear.classList.remove("on");
+    if (s.pop) setTimeout(() => {
+      const card = document.createElement("div"); card.className = "pop " + s.pop[0];
+      const k = document.createElement("div"); k.className = "k"; k.textContent = s.pop[1];
+      const t = document.createElement("div"); t.textContent = s.pop[2];
+      card.append(k, t); pops.append(card);
+      if (s.ear) { document.getElementById("ear-text").textContent = s.ear; ear.classList.add("on"); }
+    }, 1100);
+  }
+  play(); setInterval(play, 3800);
+
+  // Sections fade in as you scroll to them.
+  const io = new IntersectionObserver((entries) => entries.forEach((e) => { if (e.isIntersecting) { e.target.classList.add("seen"); io.unobserve(e.target); } }), { threshold: .12 });
+  document.querySelectorAll(".reveal").forEach((el, i) => { el.style.transitionDelay = (i % 3) * 70 + "ms"; io.observe(el); });
+</script>
+</body>
+</html>

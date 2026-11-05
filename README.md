@@ -6,6 +6,15 @@
 
 PreCue is not another voice chatbot. It is a real-time communication assistant that stays almost invisible until you need it.
 
+**Website: [koushikjavvaji.github.io/PreCue](https://koushikjavvaji.github.io/PreCue/)** · Free, no account, no PreCue server.
+
+### Quick start (no commands)
+
+1. [Download the ZIP](https://github.com/koushikjavvaji/PreCue/archive/refs/heads/main.zip) and unzip it.
+2. Double-click `PreCue.command` (Mac; the first time, right-click it and choose Open) or `PreCue.bat` (Windows).
+   The first start installs what PreCue needs (a few minutes); after that it opens in seconds.
+3. The PreCue page opens in your browser: paste your three free keys once, drop in your report, press **Start**.
+
 ## The problem
 
 You have a 100–200 page document and need to explain it to your manager in 5–10 minutes. You have to:
@@ -83,7 +92,8 @@ Early stage. Built so far:
 - **Security**: see [SECURITY.md](SECURITY.md) for where your data goes and what PreCue protects against
 - **Built for long meetings**: keeps the connection alive through silence, reconnects after network drops, joins sentences split by a pause
 - **Short phrases end on time**: after 0.8 s of silence PreCue asks Deepgram to finish the sentence, so "99 percent." is not glued to the next sentence
-- **Automated tests**: 188 offline tests (no keys, no microphone), plus real-window overlay tests, for the decision engine, fact-check safety rules, number handling, chunking, documents, speech events, reconnects, the live screen, whispers and the overlay. They run on macOS, Windows and Linux on every push
+- **The app**: one page in your browser (only on this computer) to add your keys, drop in a report and start a meeting, with live progress, a transcript that marks every checked sentence (verified, check this, not in the report) and a summary at the end
+- **Automated tests**: 225 offline tests (no keys, no microphone), plus real-window overlay tests, for the decision engine, fact-check safety rules, number handling, chunking, documents, speech events, reconnects, the live screen, whispers and the overlay. They run on macOS, Windows and Linux on every push
 
 Coming next: scanned PDFs (OCR), charts and images inside documents.
 
@@ -125,7 +135,13 @@ Optional settings in `.env`:
 
 Run all commands from the project folder.
 
-**Live copilot (the main app).** Prepares the document, starts listening and shows alerts in a small pop-up window in the top-right corner of your screen, on top of your meeting and hidden from screen sharing. The full page with the transcript is at the printed "Live screen" address. Use earphones: on laptop speakers the meeting could hear the whispers.
+**The app (easiest).** Opens the PreCue page in your browser: add your keys (saved in `.env`, tested for you), choose or drop in a document, pick your earphones and press Start. Double-clicking `PreCue.command` / `PreCue.bat` runs the same thing.
+
+```bash
+python -m scripts.app
+```
+
+**Live copilot from the terminal.** The same meeting without the start page. Prepares the document, starts listening and shows alerts in a small pop-up window in the top-right corner of your screen, on top of your meeting and hidden from screen sharing. The full page with the transcript is at the printed "Live screen" address. Use earphones: on laptop speakers the meeting could hear the whispers.
 
 ```bash
 python -m scripts.live_copilot samples/sample_report.txt
@@ -244,16 +260,25 @@ app/
   fact_checker.py   Checks one spoken claim against the document
   copilot.py        Decision engine (LangGraph): silent, alert or suggest
   voice.py          Whispers (text-to-speech to your earphones)
-  screen.py         Live screen (local web server)
+  screen.py         Live screen (local web server) and the app's guarded /api
+  session.py        The app: keys, documents, and one meeting at a time
+  settings.py       Saves and tests the API keys
+  meeting.py        One live meeting: speech in, decisions, screen and whispers out
   overlay.py        Meeting overlay on macOS: floating pop-up window, hidden from screen sharing
   overlay_tk.py     Meeting overlay on Windows and Linux
   errors.py         PreCue's error types
 web/
+  app.html          The app page: setup, getting ready, live meeting
   index.html        The live screen page
   overlay.html      The pop-up page shown in the overlay
 tests/              Offline tests (fake LLM, search and Deepgram)
+docs/
+  index.html        The public website (GitHub Pages)
+PreCue.command      Double-click to start on macOS (sets itself up the first time)
+PreCue.bat          Double-click to start on Windows
 scripts/
-  live_copilot.py   The main app
+  app.py            The app: starts the PreCue page
+  live_copilot.py   The live meeting from the terminal
   check_claims.py
   live_transcribe.py
   show_chunks.py

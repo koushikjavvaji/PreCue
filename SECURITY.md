@@ -26,6 +26,15 @@ only on `127.0.0.1` (this computer).
 - **Other websites reading your transcript**: the live screen answers only requests
   addressed to `127.0.0.1` or `localhost`, which blocks "DNS rebinding" (a website
   pointing its own name at your computer to read local pages).
+- **Other websites using the app**: the app's page can save keys, upload a file and start the
+  microphone. A website you visit cannot make those requests: the server only accepts them from
+  its own page (the browser's `Origin` must be exactly `http://127.0.0.1:<port>`) and only as JSON
+  or a file upload, never as a plain web form. The page never receives your keys back, only
+  whether each one is set and works, and it can only start documents from its own list
+  (never a file path).
+- **Saved keys and uploads**: keys typed into the app go into `.env`, written so only your user
+  account can read it. Uploaded documents are kept in `data/uploads` (never committed), also
+  readable by you only, with their names cleaned (no folders, no odd characters).
 - **Text on the screen is never run as code**: the pages show speech and LLM text with
   `textContent`, never `innerHTML`.
 - **Booby-trapped documents** (prompt injection): a document could contain text like
