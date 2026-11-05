@@ -71,7 +71,7 @@ Early stage. Built so far:
 - **Hybrid search**: vector search plus BM25 keyword search for questions with numbers, merged with Reciprocal Rank Fusion
 - **Facts table**: every number-based fact in the document, extracted by Gemini (several chunks per call) and checked against the text
 - **Number sense**: spoken number words become digits ("ninety-six" → 96), and the same amount in other units is not an error (24 lakh = 2.4 million, ₹148.6 crore = 1,486 million rupees). "About 1,200" for 1,240 is fine; "1,200" said exactly is not
-- **Periods and directions**: "this quarter" vs "last quarter" vs a target, and "rose" when the document says it fell, are caught; a claim about a quarter the document does not cover is never compared with another quarter
+- **Periods and directions**: "this quarter" vs "last quarter" vs a target (last quarter's number said as "this quarter" is also caught in code, from the facts table), and "rose" when the document says it fell, are caught; a claim about a quarter the document does not cover is never compared with another quarter
 - **Saved index**: chunks and vectors are cached, so a document is only processed once
 - **Evaluation**: a question set and a script that scores every mode and search method
 - **LangSmith tracing** (optional)

@@ -2,6 +2,8 @@
 
 import pytest
 
+from langchain_core.documents import Document
+
 from app.copilot import Copilot, section_name, spoken_value, states_a_number
 from app.errors import PreCueError
 from app.fact_checker import check_claim
@@ -279,3 +281,33 @@ def test_value_from_the_same_quarter_is_an_alert():
     assert check_claim("Revenue in Q1 was 120 crore", CHANNELS, QuarterFacts(), llm)["verdict"] == "wrong"
     llm = FakeLLM({**WRONG, "said": "30 crore", "document_says": "₹37.2 crore"})
     assert check_claim("Online sales were 30 crore", CHANNELS, QuarterFacts(), llm)["verdict"] == "wrong"  # no quarter named
+
+
+class MarginFacts(FakeFacts):
+    def for_claim(self, claim, chunks, from_chunks=10, closest=5):
+        return [{"metric": "Gross margin", "value": "38.5%", "period": "Q2 FY2026", "section": "1. Summary", "chunk": 1},
+                {"metric": "Gross margin", "value": "36.9%", "period": "Q1 FY2026", "section": "1. Summary", "chunk": 1},
+                {"metric": "Gross margin", "value": "35.1%", "period": "Q2 FY2025", "section": "1. Summary", "chunk": 1},
+                {"metric": "Brand awareness", "value": "47%", "period": "Q1 FY2026", "section": "7. Marketing", "chunk": 1},
+                {"metric": "Brand awareness", "value": "54%", "period": "Q2 FY2026", "section": "7. Marketing", "chunk": 1}]
+
+
+MARGIN = [Document(page_content="Gross margin improved to 38.5% in Q2 from 36.9% in Q1.",
+                   metadata={"chunk": 1, "section": "1. Summary", "title": "AURORA - Q2 FY2026 REVIEW"})]
+
+
+def test_last_quarters_value_said_as_this_quarter_is_an_alert():
+    llm = FakeLLM({**CORRECT, "said": "36.9 percent", "document_says": "36.9%"})
+    verdict = check_claim("Gross margin this quarter was 36.9 percent.", MARGIN, MarginFacts(), llm)
+    assert (verdict["verdict"], verdict["problem"], verdict["document_says"]) == ("wrong", "period", "38.5%")
+
+
+@pytest.mark.parametrize("claim", [
+    "Gross margin last quarter was 36.9 percent.",   # said for its own period
+    "Gross margin was 36.9 percent in Q1.",          # no "this quarter"
+    "Gross margin this quarter was 38.5 percent.",   # this quarter's value
+    "Inventory days this quarter were 47.",          # 47 is brand awareness, another metric
+])
+def test_period_check_never_alerts_on_its_own_otherwise(claim):
+    llm = FakeLLM({**CORRECT, "said": "", "document_says": ""})
+    assert check_claim(claim, MARGIN, MarginFacts(), llm)["verdict"] == "correct"

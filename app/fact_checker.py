@@ -16,6 +16,9 @@ Golden rule: a wrong alert is worse than no alert. So:
     from another quarter (the facts table says which)
   - the same number with the direction backwards ("rose to 14.5%" when it fell) is "wrong",
     with problem "direction": the code compares the claim's words with the document's change
+  - last quarter's number said as "this quarter" ("gross margin this quarter was 36.9%" when
+    36.9% is Q1 and Q2 is 38.5%) is "wrong", with problem "period". The code finds it in the
+    facts table: same metric, the claimed value only in an older period, one value for this period
 """
 
 import re
@@ -118,6 +121,11 @@ def check_claim(claim, results, facts, llm):
             verdict["verdict"], verdict["problem"] = "wrong", "direction"
         else:
             verdict["verdict"], verdict["problem"] = "correct", ""  # "24 lakh" for "2.4 million": the same amount
+    if verdict["verdict"] != "wrong" and results:
+        current = _this_period_value(claim, rows, results[0].metadata.get("title", ""))
+        if current:
+            verdict.update(verdict="wrong", problem="period", said=_said_value(claim, verdict),
+                           document_says=current["value"], section=current["section"])
     verdict["claim"] = claim
     return verdict
 
@@ -137,6 +145,55 @@ def _other_quarter(claim, document_says, rows):
         return False
     periods = [{quarter.upper() for quarter in QUARTER.findall(fact["period"])} for fact in matching]
     return all(period and not period & said for period in periods)
+
+
+THIS_PERIOD = re.compile(r"\b(this quarter|current quarter|this period)\b", re.IGNORECASE)
+PERIOD_NAME = re.compile(r"\b(Q[1-4]|H[12])\s*(FY\s*\d{2,4})?", re.IGNORECASE)
+METRIC_WORDS = re.compile(r"[a-z]{3,}")
+FILLER_WORDS = {"the", "and", "for", "from", "with", "our", "total", "rate"}
+
+
+def _this_period_value(claim, rows, title):
+    """The document's fact for this period, if the speaker said "this quarter" with an older value.
+
+    "Gross margin this quarter was 36.9%" in a Q2 report: the facts table has gross margin
+    36.9% (Q1 FY2026) and 38.5% (Q2 FY2026). Returns the Q2 fact, or None.
+    Strict on purpose, since it adds an alert: the claim must say "this quarter", every word
+    of the metric must be in the claim, the value must only be in other periods, and this
+    period must have exactly one value for that metric.
+    """
+    own = _period(title)
+    said = _said_value(claim, {"said": ""})
+    if not THIS_PERIOD.search(claim) or not own or not said:
+        return None
+    claim_words = set(METRIC_WORDS.findall(claim.lower()))
+    for metric in {fact["metric"].lower() for fact in rows}:
+        words = set(METRIC_WORDS.findall(metric)) - FILLER_WORDS
+        if not words or not words <= claim_words:
+            continue  # another metric ("brand awareness 47%" for "inventory days were 47")
+        same_metric = [fact for fact in rows if fact["metric"].lower() == metric]
+        with_value = [fact for fact in same_metric if same_value(said, fact["value"], hedged=is_hedged(claim))]
+        now = {fact["value"]: fact for fact in same_metric if _period(fact["period"]) == own}
+        if with_value and all(_period(fact["period"]) not in ("", own) for fact in with_value) and len(now) == 1:
+            return next(iter(now.values()))
+    return None
+
+
+def _period(text):
+    """ "Q2 FY2026" from a title or period like "Q2 FY2026 business review"; "" if none.
+    A period without a year ("Q2") is not enough to tell this year from last year."""
+    match = PERIOD_NAME.search(text)
+    if not match or not match.group(2):
+        return ""
+    return f"{match.group(1).upper()} {match.group(2).upper().replace(' ', '')}"
+
+
+def _said_value(claim, verdict):
+    """The value the speaker said: the LLM's copy if it has a number, else the number in the claim."""
+    if re.search(r"\d", verdict["said"]):
+        return verdict["said"]
+    found = re.search(r"(?<![\w.])\d[\d,]*(?:\.\d+)?\s*(?:%|percent|crore|lakh|million|billion)?", claim)
+    return found.group(0).strip() if found else ""
 
 
 def _same_value(claim, verdict):

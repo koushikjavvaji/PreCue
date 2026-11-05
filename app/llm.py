@@ -127,10 +127,10 @@ def model_name(llm):
 def llm_error(error, task):
     """Turn an LLM error into a short PreCueError. task: what we were doing, e.g. "adding context"."""
     if isinstance(error, (ModelRateLimitError, groq.RateLimitError)):
-        if "per day" in str(error):  # Groq says "tokens per day (TPD)" or "requests per day (RPD)"
+        if "per day" in str(error):  # Groq: "tokens per day (TPD)"; Gemini: "requests per day"
             return RateLimitError(
                 f"LLM daily free-tier limit reached while {task}. It frees up over the next hours "
-                "(Groq counts the last 24 hours). Finished work is cached, so nothing is lost.",
+                "(Groq counts the last 24 hours; Gemini resets at midnight Pacific time). Finished work is cached, so nothing is lost.",
                 daily=True,
             )
         return RateLimitError(
