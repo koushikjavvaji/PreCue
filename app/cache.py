@@ -38,3 +38,26 @@ def write_json(path, data):
     temporary.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
     temporary.chmod(0o600)
     temporary.replace(path)  # all at once: a crash mid-write never leaves a half-written file
+
+
+def forget_document(text, folder=None):
+    """Delete every cache file that holds this document's text (when you remove the document).
+
+    File names are fingerprints, so we look inside: a file that contains a few long, distinctive
+    lines of the document belongs to it. Returns how many files were deleted.
+    """
+    folder = folder or CACHE_FOLDER
+    lines = [line.strip() for line in text.splitlines()]
+    snippets = [line for line in lines if len(line) >= 30 and '"' not in line and "\\" not in line][:3]
+    if not snippets or not folder.exists():
+        return 0
+    removed = 0
+    for path in folder.glob("*.json"):
+        try:
+            content = path.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        if any(snippet in content for snippet in snippets):
+            path.unlink(missing_ok=True)
+            removed += 1
+    return removed

@@ -35,8 +35,12 @@ only on `127.0.0.1` (this computer).
 - **Saved keys and uploads**: keys typed into the app go into `.env`, written so only your user
   account can read it. Uploaded documents are kept in `data/uploads` (never committed), also
   readable by you only, with their names cleaned (no folders, no odd characters). Remove one
-  with the × next to it in the app; the samples cannot be removed. (Its cached text and facts stay
-  in `data/cache` until you delete that folder.)
+  with the × next to it in the app; the samples cannot be removed. Its cached text, chunks and
+  facts in `data/cache` are deleted with it.
+- **The launchers** download uv (a pinned version, from its official site) and, through it, Python and
+  PreCue's libraries. Nothing else is downloaded or run.
+- **Scanned PDFs**: pages that are pictures are sent to Gemini to be read, like the rest of the
+  document's text is for the facts table. Text read from a picture is treated as data, like any other.
 - **The website** (getprecue.vercel.app) is a static page plus one small function that reads the
   latest version from GitHub. It never receives your documents, keys or transcripts, and it sends
   strict security headers (no outside scripts, no framing, no camera or microphone).

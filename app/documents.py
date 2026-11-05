@@ -109,13 +109,18 @@ def pdf_to_text(path):
             raise PreCueError(f"'{path.name}' has {len(pdf.pages)} pages; the limit is {MAX_PDF_PAGES}.")
         pages = [_read_page(page) for page in pdf.pages]
         title = (pdf.metadata or {}).get("Title", "")
+        # Scanned pages: no text, but a picture of the page. Gemini reads those (app/ocr.py).
+        scanned = [number for number, page in enumerate(pages) if not page and pdf.pages[number].images]
+        if scanned:
+            from app.ocr import read_scanned_pages
+
+            for number, text in zip(scanned, read_scanned_pages([pdf.pages[n] for n in scanned])):
+                if text:
+                    pages[number] = [{"kind": "scanned", "text": text, "top": 0, "bottom": 0}]
 
     lines = [line for page in pages for line in page if line["kind"] == "line"]
     if not lines and not any(page for page in pages):
-        raise PreCueError(
-            f"'{path.name}' has no text that can be read. It may be a scanned PDF "
-            "(pictures of pages); PreCue cannot read those yet."
-        )
+        raise PreCueError(f"'{path.name}' has no text that can be read, not even in pictures of its pages.")
 
     repeated = _repeated_edge_lines(pages)
     body_size = _most_common_size(lines)
@@ -134,6 +139,13 @@ def pdf_to_text(path):
         heading_sizes = sorted({line["size"] for line in lines if _is_big(line, body_size) and not line.get("skip")},
                                reverse=True)
 
+    # A scanned first page brings its own title line ("# Title", from app/ocr.py).
+    first = pages[0][0] if pages[0] else None
+    if first and first["kind"] == "scanned" and first["text"].startswith("# "):
+        scanned_title, _, rest = first["text"].partition("\n")
+        title = scanned_title[2:]  # what is printed on the page beats the hidden metadata title
+        first["text"] = rest.strip()
+
     out = [f"# {title.strip() or path.stem}", ""]
     paragraph = []
 
@@ -145,7 +157,7 @@ def pdf_to_text(path):
     for page in pages:
         previous = None
         for item in page:
-            if item["kind"] == "table":
+            if item["kind"] in ("table", "scanned"):  # already Markdown: keep as it is
                 end_paragraph()
                 out.extend([item["text"], ""])
                 previous = None

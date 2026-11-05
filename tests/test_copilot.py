@@ -311,3 +311,19 @@ def test_last_quarters_value_said_as_this_quarter_is_an_alert():
 def test_period_check_never_alerts_on_its_own_otherwise(claim):
     llm = FakeLLM({**CORRECT, "said": "", "document_says": ""})
     assert check_claim(claim, MARGIN, MarginFacts(), llm)["verdict"] == "correct"
+
+
+def test_a_claim_said_again_is_not_checked_again():
+    copilot, llm = make_copilot(CORRECT)
+    copilot.handle("sentence", "Revenue was 10 crore.")
+    copilot.handle("sentence", "Revenue was 10 crore!")  # the same claim, other punctuation
+    assert llm.calls == 1
+    copilot.handle("sentence", "Revenue was 12 crore.")  # a different number: a new check
+    assert llm.calls == 2
+
+
+def test_a_failed_check_is_tried_again_next_time():
+    copilot, llm = make_copilot(error=PreCueError("busy"))
+    copilot.handle("sentence", "Revenue was 10 crore.")
+    copilot.handle("sentence", "Revenue was 10 crore.")
+    assert llm.calls == 2

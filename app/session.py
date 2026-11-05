@@ -142,7 +142,15 @@ class PreCueApp:
             raise PreCueError("Only your own uploaded documents can be removed.")
         if self.state["state"] in ("preparing", "live", "stopping") and self.state.get("document") == document["name"]:
             raise PreCueError("This document is in use. End the meeting first.")
-        document_path(document["id"]).unlink(missing_ok=True)
+        path = document_path(document["id"])
+        from app.cache import forget_document
+        from app.chunker import load_text
+
+        try:
+            forget_document(load_text(path))  # its text, chunks and facts in data/cache go too
+        except PreCueError:
+            pass  # an unreadable file has nothing in the cache
+        path.unlink(missing_ok=True)
         return 200, {"documents": documents()}
 
     # ---------------- the meeting ----------------

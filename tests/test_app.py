@@ -434,3 +434,19 @@ def test_starting_again_opens_the_running_precue(server, monkeypatch):
     _, screen = server
     assert launcher.already_running(screen.url)
     assert not launcher.already_running("http://127.0.0.1:1")
+
+
+def test_removing_a_document_also_forgets_its_cached_text(server, folders, monkeypatch):
+    import app.cache
+
+    cache = folders / "cache"
+    cache.mkdir()
+    monkeypatch.setattr(app.cache, "CACHE_FOLDER", cache)
+    report = "# Secret plan\n\n## 1. Money\n\nRevenue this quarter was 148.6 crore, up 13.3 percent.\n"
+    call(screen := server[1], "/api/upload", report.encode(), kind="application/octet-stream", headers={"X-File-Name": "plan.md"})
+    (cache / "index_mine.json").write_text('{"chunks": ["Revenue this quarter was 148.6 crore, up 13.3 percent."]}')
+    (cache / "index_other.json").write_text('{"chunks": ["Another report about trucks and parcels, nothing else."]}')
+
+    assert call(screen, "/api/documents/remove", {"document": "uploads/plan.md"})[0] == 200
+    assert not (cache / "index_mine.json").exists()
+    assert (cache / "index_other.json").exists()  # other documents keep their cache

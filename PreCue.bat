@@ -1,16 +1,16 @@
 @echo off
 rem PreCue for Windows: double-click this file to start. A page opens in your browser.
-rem The first time, it sets itself up (a few minutes: it downloads the libraries PreCue needs).
+rem You do not need Python: the first start gets uv, a small installer, which downloads Python
+rem and the libraries PreCue needs (a few minutes, once). After that it opens in seconds.
 cd /d "%~dp0"
+set UV_VERSION=0.13.6
 
-set PYTHON=
-for %%v in (3.13 3.12 3.11) do (
-  if not defined PYTHON py -%%v -c "import sys" >nul 2>&1 && set PYTHON=py -%%v
-)
-if not defined PYTHON (
-  echo PreCue needs Python 3.11 or newer. Get it from https://www.python.org/downloads/ and double-click again.
-  pause
-  exit /b 1
+rem uv: installs Python and PreCue's libraries. Use the one on this PC, or get it once.
+set "UV=uv"
+where uv >nul 2>&1 || set "UV=%USERPROFILE%\.local\bin\uv.exe"
+if not "%UV%"=="uv" if not exist "%UV%" (
+  echo Getting uv %UV_VERSION%, the installer PreCue uses ^(once^)...
+  powershell -NoProfile -ExecutionPolicy Bypass -Command "$env:UV_NO_MODIFY_PATH=1; irm https://astral.sh/uv/%UV_VERSION%/install.ps1 | iex" || goto failed
 )
 
 rem Install (or update) the libraries, only when requirements.txt changed since last time.
@@ -21,14 +21,13 @@ if not exist %STAMP% set SETUP=1
 if exist %STAMP% fc /b requirements.txt %STAMP% >nul || set SETUP=1
 if "%SETUP%"=="1" (
   echo Setting up PreCue. The first time takes a few minutes...
-  %PYTHON% -m venv .venv || goto failed
-  .venv\Scripts\python.exe -m pip install --quiet --upgrade pip || goto failed
-  .venv\Scripts\python.exe -m pip install --quiet -r requirements.txt || goto failed
+  if not exist .venv\Scripts\python.exe "%UV%" venv --python 3.12 .venv || goto failed
+  "%UV%" pip install --python .venv\Scripts\python.exe -r requirements.txt || goto failed
   copy /y requirements.txt %STAMP% >nul
 )
 
 if not exist .env copy .env.example .env >nul
-.venv\Scripts\python.exe -m scripts.app
+if defined PRECUE_NO_BROWSER (.venv\Scripts\python.exe -m scripts.app --no-browser) else (.venv\Scripts\python.exe -m scripts.app)
 exit /b 0
 
 :failed

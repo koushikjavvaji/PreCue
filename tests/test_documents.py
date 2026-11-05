@@ -6,6 +6,7 @@ headings, scanned pages...).
 """
 
 import sys
+from pathlib import Path
 
 import pytest
 from reportlab.lib.pagesizes import A4
@@ -20,6 +21,7 @@ from app.documents import (
     _is_real_table,
     _join_lines,
     markdown_table,
+    pdf_to_text,
     read_document,
 )
 from app.errors import PreCueError
@@ -27,6 +29,7 @@ from app.errors import PreCueError
 SAMPLE_SECTIONS = ["1. Summary", "2. Revenue", "3. Customers", "4. Operations and Technology",
                    "5. Product Launches", "6. Team and Costs", "7. Risks", "8. Plan for Q3"]
 SAMPLE_TITLE = "NIMBUS PAYMENTS - Q2 FY2026 BUSINESS REVIEW"
+SAMPLES = Path(__file__).parent.parent / "samples"
 
 
 @pytest.fixture(autouse=True)
@@ -151,9 +154,9 @@ def test_heading_that_wraps_onto_two_lines_is_one_heading(tmp_path):
 def test_scanned_pdf_gives_a_clear_error(tmp_path):
     path = tmp_path / "scanned.pdf"
     page = canvas.Canvas(str(path), pagesize=A4)
-    page.rect(50, 50, 400, 600, fill=1)  # a "picture" of a page: no text at all
+    page.rect(50, 50, 400, 600, fill=1)  # only a drawing: no text, and no picture of text either
     page.save()
-    with pytest.raises(PreCueError, match="scanned PDF"):
+    with pytest.raises(PreCueError, match="no text that can be read"):
         read_document(path)
 
 
@@ -291,3 +294,67 @@ def test_cache_files_are_private(tmp_path):
     assert cache.read_json(path) == {"text": "secret plans"}
     assert path.stat().st_mode & 0o077 == 0  # no one else can read it
     assert not list(path.parent.glob("*.tmp"))
+
+
+# ---------------- scanned PDFs (pictures of pages) ----------------
+
+def scanned_pdf(path, pages):
+    """A PDF whose pages are only pictures of text, like a scan: no text inside the PDF."""
+    from PIL import Image, ImageDraw
+
+    images = []
+    for lines in pages:
+        image = Image.new("RGB", (1240, 1754), "white")
+        draw = ImageDraw.Draw(image)
+        for number, line in enumerate(lines):
+            draw.text((100, 120 + number * 60), line, fill="black")
+        images.append(image)
+    images[0].save(path, "PDF", save_all=True, append_images=images[1:], resolution=150)
+    return path
+
+
+def test_scanned_pages_are_read_from_their_pictures(tmp_path, monkeypatch):
+    import app.ocr
+
+    asked = []
+
+    def fake_reader(png, llm):
+        asked.append(png[:8])
+        return f"## Page {len(asked)}\n\nRevenue was 1{len(asked)} crore."
+
+    monkeypatch.setattr(app.ocr, "read_page_image", fake_reader)
+    monkeypatch.setenv("GEMINI_API_KEY", "test-key")
+    path = scanned_pdf(tmp_path / "scan.pdf", [["Revenue was 11 crore."], ["Revenue was 12 crore."]])
+    text = read_document(path)
+    assert asked == [b"\x89PNG\r\n\x1a\n"] * 2  # each page sent once, as a PNG picture
+    assert "## Page 1" in text and "Revenue was 12 crore." in text
+
+
+def test_normal_pdfs_never_use_the_picture_reader(monkeypatch):
+    import app.ocr
+
+    def not_called(*args):
+        raise AssertionError("a PDF with real text was sent to the picture reader")
+
+    monkeypatch.setattr(app.ocr, "read_page_image", not_called)
+    assert "Revenue" in pdf_to_text(SAMPLES / "sample_report.pdf")
+
+
+def test_too_many_scanned_pages_are_refused(tmp_path, monkeypatch):
+    import app.ocr
+
+    monkeypatch.setattr(app.ocr, "MAX_SCANNED_PAGES", 1)
+    path = scanned_pdf(tmp_path / "scan.pdf", [["one"], ["two"]])
+    with pytest.raises(PreCueError, match="scanned pages"):
+        read_document(path)
+
+
+def test_a_scanned_first_page_gives_the_title(tmp_path, monkeypatch):
+    import app.ocr
+
+    answers = iter(["# ORBIT FOODS REVIEW\n\n## 1. Summary\n\nRevenue was 64.2 crore.", "## 2. People\n\nHeadcount was 812."])
+    monkeypatch.setattr(app.ocr, "read_page_image", lambda png, llm: next(answers))
+    monkeypatch.setenv("GEMINI_API_KEY", "test-key")
+    chunks = make_chunks(read_document(scanned_pdf(tmp_path / "scan.pdf", [["a"], ["b"]])), "scan.pdf")
+    assert chunks[0].metadata["title"] == "ORBIT FOODS REVIEW"  # not the file name, not a second title line
+    assert {c.metadata["section"] for c in chunks} == {"1. Summary", "2. People"}

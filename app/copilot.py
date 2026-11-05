@@ -50,6 +50,7 @@ TOP_K = 3
 RECENT_SENTENCES = 3  # how many recent sentences we remember
 JOIN_SECONDS = 10  # a sentence is joined to the previous one only if that one ended this recently
 FACTS_IN_SUGGESTION = 2
+REMEMBERED_VERDICTS = 200  # a claim said again in the same meeting reuses its verdict: no second LLM call
 
 
 class State(TypedDict, total=False):
@@ -86,6 +87,7 @@ class Copilot:
             "recent": [], "covered": [], "alerted": [],
             "last_chunk": 0, "suggested": False, "last_suggestion": 0, "last_sentence_time": 0.0,
         }
+        self.verdicts = {}  # claim (normalised) -> verdict, for claims said more than once
         self.graph = self._build_graph()
 
     def handle(self, event, text="", late=False):
@@ -153,10 +155,17 @@ class Copilot:
         return update
 
     def _check(self, state):
+        # Same words, any punctuation: "10 crore." and "10 crore!" (a dot inside "148.6" stays).
+        key = " ".join(word.strip(".") for word in re.findall(r"[a-z0-9.%₹]+", state["claim"].lower()))
+        if key in self.verdicts:
+            return {"verdict": dict(self.verdicts[key])}  # said before: the same answer, free and at once
         try:
             verdict = check_claim(state["claim"], state["results"], self.facts, self.llm)
-        except PreCueError as error:  # a failed check must never stop the meeting
+        except PreCueError as error:  # a failed check must never stop the meeting (and is not remembered)
             return {"verdict": None, "action": "skipped", "message": str(error)}
+        if len(self.verdicts) >= REMEMBERED_VERDICTS:
+            self.verdicts.pop(next(iter(self.verdicts)))  # forget the oldest
+        self.verdicts[key] = verdict
         return {"verdict": verdict}
 
     def _decide(self, state):

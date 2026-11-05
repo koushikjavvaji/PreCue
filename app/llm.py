@@ -10,7 +10,7 @@ which one it is. Set LIVE_LLM=gemini in .env to use Gemini for live work too.
 import os
 
 import groq
-from langchain_core.exceptions import ModelRateLimitError, OutputParserException
+from langchain_core.exceptions import ModelAPIError, ModelRateLimitError, OutputParserException
 from langchain_core.rate_limiters import InMemoryRateLimiter
 from langchain_core.runnables import RunnableLambda, RunnableWithFallbacks
 from langchain_google_genai import ChatGoogleGenerativeAI
@@ -27,19 +27,23 @@ DEFAULT_GROQ_MODEL = "openai/gpt-oss-20b"  # change with GROQ_MODEL in .env
 DEFAULT_GROQ_BACKUP_MODEL = "openai/gpt-oss-120b"
 
 # Every error an LLM call can raise that we know how to report nicely.
-LLM_ERRORS = (ChatGoogleGenerativeAIError, groq.GroqError, OutputParserException, ValidationError)
+LLM_ERRORS = (ChatGoogleGenerativeAIError, ModelAPIError, groq.GroqError, OutputParserException, ValidationError)
 
 _rate_limiters = {}  # one limiter per provider, shared by every call in this run
 
 
-def get_gemini():
-    """Return a Gemini chat model. Reads GEMINI_API_KEY (and optional settings) from .env."""
+def get_gemini(live=False):
+    """Return a Gemini chat model. Reads GEMINI_API_KEY (and optional settings) from .env.
+
+    live=True: for checks during a meeting. Google sometimes answers "busy" (503); before the
+    meeting we can wait and retry for a while, but in a meeting a late alert is useless.
+    """
     return ChatGoogleGenerativeAI(
         model=os.getenv("GEMINI_MODEL", DEFAULT_GEMINI_MODEL),
         google_api_key=_api_key("GEMINI_API_KEY", "Gemini"),
         rate_limiter=_rate_limiter("GEMINI_REQUESTS_PER_MINUTE", default=15),
-        max_retries=3,  # retry when Google is busy (503)
-        timeout=60,
+        max_retries=1 if live else 3,  # retry when Google is busy (503)
+        timeout=10 if live else 60,  # 10 s is the shortest Google accepts
     )
 
 
@@ -63,19 +67,30 @@ def get_live_llm():
     if choice == "groq":
         return groq_with_backup()
     if choice == "gemini":
-        return get_gemini()
+        return get_gemini(live=True)
     raise PreCueError("LIVE_LLM in .env must be 'groq' or 'gemini'.")
 
 
 def groq_with_backup():
-    """The Groq model, with the backup model ready for when it fails (usually its free-tier limit)."""
+    """The Groq model, with backups ready for when it fails (usually its free-tier limit):
+
+      Groq main model -> Groq backup model -> Gemini (if you have a Gemini key)
+
+    Each has its own free quota, so together they give the most checks a day. Gemini is last
+    because it is slower (a few seconds), but a slow check is better than none.
+    """
     main_model = os.getenv("GROQ_MODEL", DEFAULT_GROQ_MODEL)
     backup_model = os.getenv("GROQ_BACKUP_MODEL", DEFAULT_GROQ_BACKUP_MODEL)
-    if not backup_model or backup_model == main_model:
+    backups = []
+    if backup_model and backup_model != main_model:
+        backups.append(get_groq(backup_model))
+    if _has_key("GEMINI_API_KEY"):
+        backups.append(get_gemini(live=True))
+    if not backups:
         return get_groq(main_model)
     # No retries for the main model: waiting for it would make the alert late, the backup answers at once.
     main = get_groq(main_model, max_retries=0)
-    return main.with_fallbacks([get_groq(backup_model)], exceptions_to_handle=(groq.GroqError,))
+    return main.with_fallbacks(backups, exceptions_to_handle=(groq.GroqError,))
 
 
 def structured(llm, schema):
@@ -86,17 +101,23 @@ def structured(llm, schema):
     A model with a backup: both are set up the same way, and the backup answers when the main one fails.
     """
     if isinstance(llm, RunnableWithFallbacks):
-        main = structured(llm.runnable, schema)
-        backup = structured(llm.fallbacks[0], schema)
+        models = [structured(model, schema) for model in [llm.runnable, *llm.fallbacks]]
+        rejected = set()  # models whose key was refused: asking again would only make every check slower
 
         def ask(prompt):
-            try:
-                return main.invoke(prompt)
-            except groq.GroqError:
-                # If the backup fails too, ITS error is raised: it says how long to really wait.
-                # (LangChain's own fallbacks raise the main model's error, e.g. "daily limit",
-                # when the backup only needs a few seconds.)
-                return backup.invoke(prompt)
+            for number, model in enumerate(models[:-1]):
+                if number in rejected:
+                    continue
+                try:
+                    return model.invoke(prompt)
+                except (groq.AuthenticationError, groq.PermissionDeniedError):
+                    rejected.add(number)  # a wrong key does not fix itself during the meeting
+                except groq.GroqError:
+                    continue  # its limit is reached: the next one answers
+            # If the last one fails too, ITS error is raised: it says how long to really wait.
+            # (LangChain's own fallbacks raise the first model's error, e.g. "daily limit",
+            # when the backup only needs a few seconds.)
+            return models[-1].invoke(prompt)
 
         return RunnableLambda(ask)
     if isinstance(llm, ChatGroq):
@@ -137,7 +158,16 @@ def llm_error(error, task):
             f"LLM free-tier limit reached while {task}. Wait a minute and run again. "
             "Finished work is cached, so nothing is lost."
         )
+    busy = ("503", "UNAVAILABLE", "504", "DEADLINE_EXCEEDED")  # overloaded, or too slow to answer in time
+    if any(word in str(error) for word in busy) or isinstance(error, groq.InternalServerError):
+        # The provider is overloaded for a moment ("high demand"): like a short rate limit, worth a retry.
+        return RateLimitError(f"The LLM is busy right now while {task}. Try again in a moment.")
     return PreCueError(f"LLM failed while {task}: {str(error)[:300]}")
+
+
+def _has_key(name):
+    value = os.getenv(name)
+    return bool(value) and value != "your_key_here"
 
 
 def _api_key(name, provider):
@@ -154,7 +184,9 @@ def _rate_limiter(setting, default):
             per_minute = int(os.getenv(setting, default))
         except ValueError:
             raise PreCueError(f"{setting} in .env must be a whole number.") from None
-        _rate_limiters[setting] = InMemoryRateLimiter(
-            requests_per_second=per_minute / 60, max_bucket_size=1
-        )
+        limiter = InMemoryRateLimiter(requests_per_second=per_minute / 60, max_bucket_size=1)
+        # It starts empty, so the very first call would wait a whole interval (2 s for Groq, 4 s for
+        # Gemini): in a meeting, that is the first alert arriving late. Start with one call ready.
+        limiter.available_tokens = 1.0
+        _rate_limiters[setting] = limiter
     return _rate_limiters[setting]

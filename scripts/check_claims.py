@@ -67,7 +67,7 @@ def show(verdict):
 
 def check_waiting_for_limits(claim, retriever, facts, llm):
     """Check one claim. An evaluation sends claims back to back, faster than a meeting would,
-    so it can hit the free tier's per-minute limit: then wait and try again.
+    so it can hit the free tier's per-minute limit, or find the LLM busy: then wait and try again.
     Returns (verdict, seconds the check itself took)."""
     claim = words_to_digits(claim)  # as the live copilot does
     for attempt in range(RATE_LIMIT_TRIES):
@@ -78,7 +78,8 @@ def check_waiting_for_limits(claim, retriever, facts, llm):
         except RateLimitError as error:
             if error.daily or attempt == RATE_LIMIT_TRIES - 1:
                 raise
-            print(f"     (free-tier limit, waiting {RATE_LIMIT_WAIT} s)")
+            reason = "the LLM is busy" if "busy" in str(error) else "free-tier limit"
+            print(f"     ({reason}, waiting {RATE_LIMIT_WAIT} s)")
             time.sleep(RATE_LIMIT_WAIT)
 
 

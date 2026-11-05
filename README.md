@@ -12,7 +12,7 @@ PreCue is not another voice chatbot. It is a real-time communication assistant t
 
 1. [Download the ZIP](https://github.com/koushikjavvaji/PreCue/archive/refs/heads/main.zip) and unzip it.
 2. Double-click `PreCue.command` (Mac; the first time, right-click it and choose Open) or `PreCue.bat` (Windows).
-   The first start installs what PreCue needs (a few minutes); after that it opens in seconds.
+   You do not need Python: the first start installs everything PreCue needs, Python included (a few minutes); after that it opens in seconds.
 3. The PreCue page opens in your browser: paste your three free keys once, drop in your report, press **Start**.
 
 ## The problem
@@ -73,7 +73,7 @@ Before the meeting, you upload documents (PDFs, reports, presentations). They ar
 Early stage. Built so far:
 
 - **Live speech-to-text** with Deepgram (partial and final text, speech start and pause events)
-- **Documents**: `.pdf`, `.docx` (Word), `.pptx` (PowerPoint), `.txt` and `.md`. PDFs keep their headings (found by font), tables, and reading order on two-column pages; page headers, footers and page numbers are removed. Scanned PDFs (pictures of pages) are not supported yet
+- **Documents**: `.pdf`, `.docx` (Word), `.pptx` (PowerPoint), `.txt` and `.md`. PDFs keep their headings (found by font), tables, and reading order on two-column pages; page headers, footers and page numbers are removed. Scanned PDFs (pictures of pages) are read by Gemini, page by page, once (up to 60 scanned pages)
 - **Section-aware chunking**
 - **Contextual retrieval** (an LLM writes a short context for each chunk) using Gemini
 - **Embeddings** with a local model, in three modes: `plain`, `contextual` and `late` (late chunking, also for long documents)
@@ -95,11 +95,11 @@ Early stage. Built so far:
 - **The app**: one page in your browser (only on this computer) to add your keys, drop in a report and start a meeting, with live progress, a transcript that marks every checked sentence (verified, check this, not in the report) and a summary at the end
 - **Automated tests**: 243 offline tests (no keys, no microphone), plus real-window overlay tests, for the decision engine, fact-check safety rules, number handling, chunking, documents, speech events, reconnects, the live screen, the app and its API, the website backend, whispers and the overlay. They run on macOS, Windows and Linux on every push
 
-Coming next: scanned PDFs (OCR), charts and images inside documents.
+Coming next: charts and images inside documents.
 
 ## Setup
 
-Requires Python 3.11+ and a microphone. Used on macOS; the tests also run on Windows and Linux.
+Requires a microphone. The double-click launchers (`PreCue.command`, `PreCue.bat`) install Python 3.12 for PreCue by themselves, using [uv](https://docs.astral.sh/uv/). For the steps below you need Python 3.11+. Used on macOS; the tests also run on Windows and Linux.
 
 ```bash
 git clone https://github.com/koushikjavvaji/PreCue.git
@@ -125,7 +125,7 @@ Optional settings in `.env`:
 - `GEMINI_MODEL`: the Gemini model to use (default `gemini-3.5-flash-lite`)
 - `GEMINI_REQUESTS_PER_MINUTE`: how fast to call Gemini (default `15`, the free-tier limit). Calls are spaced out automatically.
 - `GROQ_MODEL` (default `openai/gpt-oss-20b`) and `GROQ_REQUESTS_PER_MINUTE` (default `30`)
-- `GROQ_BACKUP_MODEL` (default `openai/gpt-oss-120b`): used automatically when `GROQ_MODEL` hits its free-tier limit. Each Groq model has its own limit (200,000 tokens a day, about 150 checks), so the backup doubles how many checks you get a day.
+- `GROQ_BACKUP_MODEL` (default `openai/gpt-oss-120b`): used automatically when `GROQ_MODEL` hits its free-tier limit. Each Groq model has its own limit (200,000 tokens a day, about 150 checks), so the backup doubles how many checks you get a day. If both Groq models are limited (or the Groq key is wrong), Gemini answers instead: a few seconds slower, but the meeting keeps its checks. A claim said twice in one meeting is checked only once.
 - `LIVE_LLM`: `groq` (default) or `gemini`, if you have no Groq key. Gemini is fine for `check_claims`, but too slow for a live meeting: in our test a check took about 20 seconds, so most alerts came too late and were skipped.
 - `WHISPER_DEVICE`: part of your earphones' name, e.g. `AirPods`. List devices with `python -m sounddevice`. Without it, whispers play on the default output.
 - `WHISPER_VOLUME`: from `0` to `1` (default `0.6`)
