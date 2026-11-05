@@ -61,7 +61,8 @@ def add_context(chunks, document, llm, model_name):
 
 
 def _ask_llm(llm, document, chunk):
-    reply = ask_patiently(lambda: llm.invoke(PROMPT.format(document=document, chunk=chunk)), "adding context")
+    prompt = PROMPT.format(document=document, chunk=chunk)
+    reply = ask_patiently(llm, lambda model: model.invoke(prompt), "adding context")
     context = reply.text.strip()
     if not context:
         raise PreCueError("The LLM returned an empty context.")

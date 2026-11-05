@@ -11,7 +11,7 @@ from app.embedder import Embedder
 from app.facts import FactsTable, extract_facts
 from app.index import build_index
 from app.injection import suspicious_sections
-from app.llm import get_gemini, model_name
+from app.llm import gemini_models, model_name
 from app.retriever import Retriever
 
 
@@ -34,8 +34,8 @@ def prepare(path, mode="plain", embedder=None, report=None):
                "PreCue will not follow it, but check that the document was not tampered with.")
 
     report("step", "Building the facts table")
-    gemini = get_gemini()
-    rows = extract_facts(chunks, load_text(path), gemini, model_name=model_name(gemini),
+    gemini = gemini_models()  # main + backup model; the main one names the cache
+    rows = extract_facts(chunks, load_text(path), gemini, model_name=model_name(gemini[0]),
                          on_progress=lambda done, total: report("progress", f"{done}/{total}"))
     return retriever, FactsTable(rows, embedder)
 

@@ -13,7 +13,7 @@ from app.cache import cache_file, read_json, write_json
 from app.chunker import CHUNK_OVERLAP, CHUNK_SIZE, CHUNKER_VERSION, load_text, make_chunks
 from app.contextualizer import add_context
 from app.errors import PreCueError
-from app.llm import get_gemini, model_name
+from app.llm import gemini_models, model_name
 
 MODES = ["plain", "contextual", "late"]
 
@@ -27,8 +27,8 @@ def build_index(path, mode, embedder):
     llm = None
     llm_name = ""
     if mode == "contextual":
-        llm = get_gemini()
-        llm_name = model_name(llm)
+        llm = gemini_models()
+        llm_name = model_name(llm[0])  # the main model names the cache, so a backup answer does not start a new one
 
     # Everything the index depends on goes into the cache file name.
     settings = [mode, embedder.model_name, llm_name, str(CHUNK_SIZE), str(CHUNK_OVERLAP), CHUNKER_VERSION]

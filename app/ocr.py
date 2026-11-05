@@ -33,9 +33,9 @@ def read_scanned_pages(pages, llm=None):
         raise PreCueError(f"This PDF has {len(pages)} scanned pages; PreCue reads at most {MAX_SCANNED_PAGES}. "
                           "Split it, or use a PDF with real text.")
     if llm is None:
-        from app.llm import get_gemini  # only needed for scanned PDFs
+        from app.llm import gemini_models  # only needed for scanned PDFs
 
-        llm = get_gemini()
+        llm = gemini_models()
     return [read_page_image(page_picture(page), llm) for page in pages]
 
 
@@ -53,4 +53,4 @@ def read_page_image(png, llm):
 
     picture = "data:image/png;base64," + base64.b64encode(png).decode()
     message = HumanMessage(content=[{"type": "text", "text": PROMPT}, {"type": "image_url", "image_url": picture}])
-    return ask_patiently(lambda: llm.invoke([message]).text.strip(), "reading a scanned page")
+    return ask_patiently(llm, lambda model: model.invoke([message]).text.strip(), "reading a scanned page")

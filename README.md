@@ -128,6 +128,7 @@ Never commit `.env`. It is already in `.gitignore`.
 Optional settings in `.env`:
 
 - `GEMINI_MODEL`: the Gemini model to use (default `gemini-3.5-flash-lite`)
+- `GEMINI_BACKUP_MODEL` (default `gemini-flash-lite-latest`): asked when `GEMINI_MODEL` is busy ("high demand") or at its limit. Google's models are busy at different times, so preparing a document rarely has to wait. Empty turns it off.
 - `GEMINI_REQUESTS_PER_MINUTE`: how fast to call Gemini (default `15`, the free-tier limit). Calls are spaced out automatically.
 - `GROQ_MODEL` (default `openai/gpt-oss-20b`) and `GROQ_REQUESTS_PER_MINUTE` (default `30`)
 - `GROQ_BACKUP_MODEL` (default `openai/gpt-oss-120b`): used automatically when `GROQ_MODEL` hits its free-tier limit. Each Groq model has its own limit (200,000 tokens a day, about 150 checks), so the backup doubles how many checks you get a day. If both Groq models are limited (or the Groq key is wrong), Gemini answers instead: a few seconds slower, but the meeting keeps its checks. A claim said twice in one meeting is checked only once. Set `LIVE_GEMINI_BACKUP=off` to skip a check instead of waiting for Gemini.

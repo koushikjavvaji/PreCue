@@ -22,6 +22,9 @@ from pydantic import ValidationError
 from app.errors import PreCueError, RateLimitError
 
 DEFAULT_GEMINI_MODEL = "gemini-3.5-flash-lite"  # change with GEMINI_MODEL in .env
+# Asked when GEMINI_MODEL is busy ("high demand") or at its limit: Google's models are busy at
+# different times and have separate limits. Change with GEMINI_BACKUP_MODEL (empty = none).
+DEFAULT_GEMINI_BACKUP_MODEL = "gemini-flash-lite-latest"
 DEFAULT_GROQ_MODEL = "openai/gpt-oss-20b"  # change with GROQ_MODEL in .env
 # Used when the main Groq model hits its free-tier limit: each model has its own limit
 # (200,000 tokens a day), so the backup doubles the checks a day. Change with GROQ_BACKUP_MODEL.
@@ -33,14 +36,21 @@ LLM_ERRORS = (ChatGoogleGenerativeAIError, ModelAPIError, groq.GroqError, Output
 _rate_limiters = {}  # one limiter per provider, shared by every call in this run
 
 
-def get_gemini(live=False):
+def gemini_models(live=False):
+    """The Gemini model and its backup model (if set), main first. See DEFAULT_GEMINI_BACKUP_MODEL."""
+    main = get_gemini(live)
+    backup = os.getenv("GEMINI_BACKUP_MODEL", DEFAULT_GEMINI_BACKUP_MODEL)
+    return [main] if not backup or backup == main.model else [main, get_gemini(live, model=backup)]
+
+
+def get_gemini(live=False, model=None):
     """Return a Gemini chat model. Reads GEMINI_API_KEY (and optional settings) from .env.
 
     live=True: for checks during a meeting. Google sometimes answers "busy" (503); before the
     meeting we can wait and retry for a while, but in a meeting a late alert is useless.
     """
     return ChatGoogleGenerativeAI(
-        model=os.getenv("GEMINI_MODEL", DEFAULT_GEMINI_MODEL),
+        model=model or os.getenv("GEMINI_MODEL", DEFAULT_GEMINI_MODEL),
         google_api_key=_api_key("GEMINI_API_KEY", "Gemini"),
         rate_limiter=_rate_limiter("GEMINI_REQUESTS_PER_MINUTE", default=15),
         max_retries=1 if live else 3,  # retry when Google is busy (503)
@@ -86,7 +96,7 @@ def groq_with_backup():
     if backup_model and backup_model != main_model:
         backups.append(get_groq(backup_model))
     if _has_key("GEMINI_API_KEY") and os.getenv("LIVE_GEMINI_BACKUP", "on").lower() != "off":
-        backups.append(get_gemini(live=True))
+        backups.extend(gemini_models(live=True))
     if not backups:
         return get_groq(main_model)
     # No retries for the main model: waiting for it would make the alert late, the backup answers at once.
@@ -150,20 +160,31 @@ def model_name(llm):
 BUSY_WAITS = [10, 20, 30, 60]  # seconds to wait before each new try when the LLM is busy (2 minutes in all)
 
 
-def ask_patiently(ask, task):
-    """Run ask() for work done BEFORE the meeting (facts table, scanned pages, context).
+def as_list(llm):
+    """One model, or a list of models (main first, then backups): always a list."""
+    return llm if isinstance(llm, list) else [llm]
 
-    There is time then: when the LLM is busy or a per-minute limit is hit, wait and try again
-    instead of making you press Start again. A daily limit will not pass soon, so it is raised.
+
+def ask_patiently(llms, ask, task):
+    """ask(llm) with each model in turn, for work done BEFORE the meeting (facts table, scanned pages, context).
+
+    There is time then. When a model is busy or at its limit, the next one is asked at once; when
+    all of them are, wait and try again instead of making you press Start again. Daily limits on
+    every model will not pass soon, so then the error is raised. Any other error is raised at once.
     """
     for wait in BUSY_WAITS + [None]:
-        try:
-            return ask()
-        except LLM_ERRORS as error:
-            problem = llm_error(error, task)
-            if wait is None or not isinstance(problem, RateLimitError) or problem.daily:
-                raise problem from error
-            time.sleep(wait)
+        problems = []
+        for llm in as_list(llms):
+            try:
+                return ask(llm)
+            except LLM_ERRORS as error:
+                problem = llm_error(error, task)
+                if not isinstance(problem, RateLimitError):
+                    raise problem from error
+                problems.append(problem)
+        if wait is None or all(problem.daily for problem in problems):
+            raise problems[-1]
+        time.sleep(wait)
 
 
 def llm_error(error, task):

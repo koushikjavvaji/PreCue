@@ -96,6 +96,7 @@ def test_the_main_model_does_not_retry_when_there_is_a_backup(monkeypatch):
 def test_gemini_answers_when_both_groq_models_cannot(monkeypatch):
     monkeypatch.setenv("GROQ_API_KEY", "test-key")
     monkeypatch.setenv("GEMINI_API_KEY", "test-key")
+    monkeypatch.setenv("GEMINI_BACKUP_MODEL", "")  # one Gemini model here, to keep the test simple
     chain = groq_with_backup()
     assert model_name(chain) == "openai/gpt-oss-20b (backup: openai/gpt-oss-120b, gemini-3.5-flash-lite)"
     main, backup, gemini = Model(error=rate_limit("tokens per day")), Model(error=rate_limit("tokens per day")), Model(answer="gemini")
@@ -114,6 +115,7 @@ def test_the_gemini_backup_can_be_turned_off(monkeypatch):
 
 
 def test_a_rejected_groq_key_still_gets_an_answer_from_gemini(monkeypatch):
+    monkeypatch.setenv("GEMINI_BACKUP_MODEL", "")
     monkeypatch.setenv("GROQ_API_KEY", "bad-key")
     monkeypatch.setenv("GEMINI_API_KEY", "test-key")
     response = httpx.Response(401, request=httpx.Request("POST", "https://api.groq.com"))
@@ -244,6 +246,7 @@ def test_other_bad_requests_are_not_tried_again(monkeypatch):
 
 
 def test_a_rejected_key_is_not_asked_again(monkeypatch):
+    monkeypatch.setenv("GEMINI_BACKUP_MODEL", "")
     monkeypatch.setenv("GROQ_API_KEY", "bad-key")
     monkeypatch.setenv("GEMINI_API_KEY", "test-key")
     response = httpx.Response(401, request=httpx.Request("POST", "https://api.groq.com"))
@@ -327,3 +330,51 @@ def test_building_facts_waits_out_a_busy_llm(monkeypatch, tmp_path):
     chunks = [Document(page_content="Revenue was 10 crore.", metadata={"title": "T", "section": "1", "chunk": 1})]
     assert extract_facts(chunks, "doc", llm, "model") == []
     assert llm.asked == 3  # two busy answers waited out, then the real answer
+
+
+def busy_gemini():
+    from langchain_google_genai.chat_models import GoogleAPIError
+
+    return GoogleAPIError(503, {"error": {"code": 503, "message": "high demand", "status": "UNAVAILABLE"}})
+
+
+def test_a_busy_model_hands_over_to_its_backup_at_once(monkeypatch):
+    from app.llm import ask_patiently
+
+    waits = []
+    monkeypatch.setattr("app.llm.time.sleep", waits.append)
+    main, backup = Model(error=busy_gemini()), Model(answer="from the backup")
+    assert ask_patiently([main, backup], lambda model: model.invoke("hi"), "testing") == "from the backup"
+    assert waits == []  # no waiting: the backup was free
+
+
+def test_when_every_model_is_busy_we_wait_and_try_again(monkeypatch):
+    from app.llm import ask_patiently
+
+    waits = []
+    monkeypatch.setattr("app.llm.time.sleep", waits.append)
+    main, backup = Model(error=busy_gemini()), Model(error=busy_gemini())
+    with pytest.raises(RateLimitError, match="busy"):
+        ask_patiently([main, backup], lambda model: model.invoke("hi"), "testing")
+    assert waits == [10, 20, 30, 60] and main.asked == backup.asked == 5
+
+
+def test_other_errors_are_not_retried(monkeypatch):
+    from app.errors import PreCueError
+    from app.llm import ask_patiently
+
+    main = Model(error=groq.APIConnectionError(request=httpx.Request("POST", "https://api.groq.com")))
+    backup = Model(answer="never asked")
+    with pytest.raises(PreCueError):
+        ask_patiently([main, backup], lambda model: model.invoke("hi"), "testing")
+    assert backup.asked == 0
+
+
+def test_the_gemini_backup_model_is_set_up(monkeypatch):
+    from app.llm import gemini_models
+
+    monkeypatch.setenv("GEMINI_API_KEY", "test-key")
+    monkeypatch.delenv("GEMINI_BACKUP_MODEL", raising=False)
+    assert [m.model for m in gemini_models()] == ["gemini-3.5-flash-lite", "gemini-flash-lite-latest"]
+    monkeypatch.setenv("GEMINI_BACKUP_MODEL", "")
+    assert len(gemini_models()) == 1

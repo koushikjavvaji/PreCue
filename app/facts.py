@@ -28,7 +28,7 @@ from pydantic import BaseModel, Field
 
 from app.cache import cache_file, read_json, write_json
 from app.errors import PreCueError
-from app.llm import ask_patiently
+from app.llm import as_list, ask_patiently
 
 
 class Fact(BaseModel):
@@ -74,13 +74,13 @@ def extract_facts(chunks, document, llm, model_name, on_progress=None):
     """
     path = cache_file("facts", model_name, document)
     cache = read_json(path) or {}
-    reader = llm.with_structured_output(FactList)
+    readers = [model.with_structured_output(FactList) for model in as_list(llm)]  # llm: one model, or main + backup
 
     texts = [chunk.metadata.get("original", chunk.page_content) for chunk in chunks]  # without the context line
     todo = list(dict.fromkeys(text for text in texts if text not in cache))  # each new text once, in order
     todo_groups = groups(todo)
     for done, group in enumerate(todo_groups, start=1):
-        found = _ask_llm(reader, chunks[0].metadata["title"], group)
+        found = _ask_llm(readers, chunks[0].metadata["title"], group)
         for number, text in enumerate(group, start=1):
             # Keep a fact only if its value really is in its own part (the LLM can invent, or mix up parts).
             cache[text] = [
@@ -167,10 +167,10 @@ def facts_for(table, chunks):
     return [fact for fact in table if fact["chunk"] in wanted]
 
 
-def _ask_llm(reader, title, texts):
+def _ask_llm(readers, title, texts):
     parts = "\n\n".join(f'<part number="{number}">\n{text}\n</part>' for number, text in enumerate(texts, start=1))
-    result = ask_patiently(lambda: reader.invoke(PROMPT.format(count=len(texts), title=title, parts=parts)),
-                           "extracting facts")
+    prompt = PROMPT.format(count=len(texts), title=title, parts=parts)
+    result = ask_patiently(readers, lambda reader: reader.invoke(prompt), "extracting facts")
     if result is None:
         raise PreCueError("The LLM did not return facts in the expected format.")
     return [fact.model_dump() for fact in result.facts]
