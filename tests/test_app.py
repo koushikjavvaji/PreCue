@@ -293,7 +293,7 @@ def test_meeting_starts_goes_live_and_stops(server, fakes):
     screen.clients.append(_Recorder(seen))
 
     status, data = call(screen, "/api/start", {"document": "samples/sample_report.txt", "voice": False, "overlay": True})
-    assert status == 200 and data["session"]["state"] == "preparing"
+    assert status == 200 and data["session"]["state"] in ("preparing", "live")  # the fakes are that fast
     assert wait_for(lambda: precue.state["state"] == "live"), precue.state
     assert precue.state["text"] == "3 parts and 2 facts ready"
     assert all(step["done"] for step in precue.state["steps"])
