@@ -16,7 +16,7 @@ from langchain_core.documents import Document
 
 from app.cache import cache_file, read_json, write_json
 from app.errors import PreCueError
-from app.llm import LLM_ERRORS, llm_error
+from app.llm import ask_patiently
 
 # The document goes first and the chunk last. Every call for the same
 # document then starts with the same text, which lets the provider reuse it.
@@ -61,10 +61,7 @@ def add_context(chunks, document, llm, model_name):
 
 
 def _ask_llm(llm, document, chunk):
-    try:
-        reply = llm.invoke(PROMPT.format(document=document, chunk=chunk))
-    except LLM_ERRORS as error:
-        raise llm_error(error, "adding context") from error
+    reply = ask_patiently(lambda: llm.invoke(PROMPT.format(document=document, chunk=chunk)), "adding context")
     context = reply.text.strip()
     if not context:
         raise PreCueError("The LLM returned an empty context.")

@@ -451,3 +451,19 @@ def test_removing_a_document_also_forgets_its_cached_text(server, folders, monke
     assert call(screen, "/api/documents/remove", {"document": "uploads/plan.md"})[0] == 200
     assert not (cache / "index_mine.json").exists()
     assert (cache / "index_other.json").exists()  # other documents keep their cache
+
+
+def test_removing_a_copy_keeps_the_cache_the_other_copy_needs(server, folders, monkeypatch):
+    import app.cache
+
+    cache = folders / "cache"
+    cache.mkdir()
+    monkeypatch.setattr(app.cache, "CACHE_FOLDER", cache)
+    report = "# Report\n\n## 1. Money\n\nRevenue this quarter was 148.6 crore, up 13.3 percent.\n"
+    (folders / "samples" / "sample_report.txt").write_text(report, encoding="utf-8")
+    _, screen = server
+    call(screen, "/api/upload", report.encode(), kind="application/octet-stream", headers={"X-File-Name": "copy.txt"})
+    (cache / "index_shared.json").write_text('{"chunks": ["Revenue this quarter was 148.6 crore, up 13.3 percent."]}')
+
+    assert call(screen, "/api/documents/remove", {"document": "uploads/copy.txt"})[0] == 200
+    assert (cache / "index_shared.json").exists()  # the sample has the same text and still uses it

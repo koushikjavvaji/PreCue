@@ -28,7 +28,7 @@ from pydantic import BaseModel, Field
 
 from app.cache import cache_file, read_json, write_json
 from app.errors import PreCueError
-from app.llm import LLM_ERRORS, llm_error
+from app.llm import ask_patiently
 
 
 class Fact(BaseModel):
@@ -169,10 +169,8 @@ def facts_for(table, chunks):
 
 def _ask_llm(reader, title, texts):
     parts = "\n\n".join(f'<part number="{number}">\n{text}\n</part>' for number, text in enumerate(texts, start=1))
-    try:
-        result = reader.invoke(PROMPT.format(count=len(texts), title=title, parts=parts))
-    except LLM_ERRORS as error:
-        raise llm_error(error, "extracting facts") from error
+    result = ask_patiently(lambda: reader.invoke(PROMPT.format(count=len(texts), title=title, parts=parts)),
+                           "extracting facts")
     if result is None:
         raise PreCueError("The LLM did not return facts in the expected format.")
     return [fact.model_dump() for fact in result.facts]

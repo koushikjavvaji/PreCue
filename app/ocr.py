@@ -49,11 +49,8 @@ def page_picture(page):
 
 def read_page_image(png, llm):
     """Ask the LLM for the text in one page picture."""
-    from app.llm import LLM_ERRORS, llm_error
+    from app.llm import ask_patiently
 
     picture = "data:image/png;base64," + base64.b64encode(png).decode()
     message = HumanMessage(content=[{"type": "text", "text": PROMPT}, {"type": "image_url", "image_url": picture}])
-    try:
-        return llm.invoke([message]).text.strip()
-    except LLM_ERRORS as error:
-        raise llm_error(error, "reading a scanned page") from error
+    return ask_patiently(lambda: llm.invoke([message]).text.strip(), "reading a scanned page")

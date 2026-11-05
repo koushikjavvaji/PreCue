@@ -298,3 +298,32 @@ def test_a_gemini_deadline_is_also_a_short_wait():
     late = GoogleAPIError(504, {"error": {"code": 504, "message": "Deadline expired", "status": "DEADLINE_EXCEEDED"}})
     error = llm_error(late, "checking a claim")
     assert isinstance(error, RateLimitError) and not error.daily
+
+
+def test_building_facts_waits_out_a_busy_llm(monkeypatch, tmp_path):
+    from langchain_google_genai.chat_models import GoogleAPIError
+
+    import app.cache
+    import app.facts
+    from app.facts import FactList, extract_facts
+
+    monkeypatch.setattr(app.cache, "CACHE_FOLDER", tmp_path)
+    monkeypatch.setattr("app.llm.time.sleep", lambda seconds: None)
+    busy = GoogleAPIError(503, {"error": {"code": 503, "message": "high demand", "status": "UNAVAILABLE"}})
+
+    class BusyThenFine:
+        asked = 0
+
+        def with_structured_output(self, schema):
+            return self
+
+        def invoke(self, prompt):
+            self.asked += 1
+            if self.asked < 3:
+                raise busy
+            return FactList(facts=[])
+
+    llm = BusyThenFine()
+    chunks = [Document(page_content="Revenue was 10 crore.", metadata={"title": "T", "section": "1", "chunk": 1})]
+    assert extract_facts(chunks, "doc", llm, "model") == []
+    assert llm.asked == 3  # two busy answers waited out, then the real answer

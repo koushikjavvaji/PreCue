@@ -147,7 +147,12 @@ class PreCueApp:
         from app.chunker import load_text
 
         try:
-            forget_document(load_text(path))  # its text, chunks and facts in data/cache go too
+            text = load_text(path)
+            # Its text, chunks and facts in data/cache go too, unless another listed document is the same
+            # text (a copy, or the sample it came from): that one still needs them.
+            others = [document_path(d["id"]) for d in documents() if d["id"] != document["id"]]
+            if not any(_same_text(other, text) for other in others):
+                forget_document(text)
         except PreCueError:
             pass  # an unreadable file has nothing in the cache
         path.unlink(missing_ok=True)
@@ -344,6 +349,16 @@ def output_devices():
     return [{"name": name, "default": name == default, "speaker": "speaker" in name.lower(),
              "earphones": bool(EARPHONES.search(name))}
             for name in sorted(set(names), key=lambda n: (n != default, not EARPHONES.search(n)))]
+
+
+def _same_text(path, text):
+    """True if the document at path has exactly this text. Unreadable files never match."""
+    from app.chunker import load_text
+
+    try:
+        return load_text(path) == text
+    except PreCueError:
+        return False
 
 
 def _volume():

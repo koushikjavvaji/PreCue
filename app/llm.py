@@ -8,6 +8,7 @@ which one it is. Set LIVE_LLM=gemini in .env to use Gemini for live work too.
 """
 
 import os
+import time
 
 import groq
 from langchain_core.exceptions import ModelAPIError, ModelRateLimitError, OutputParserException
@@ -144,6 +145,25 @@ def model_name(llm):
         backups = ", ".join(model_name(backup) for backup in llm.fallbacks)
         return f"{model_name(llm.runnable)} (backup: {backups})"
     return getattr(llm, "model", None) or getattr(llm, "model_name", "unknown")
+
+
+BUSY_WAITS = [10, 20, 30, 60]  # seconds to wait before each new try when the LLM is busy (2 minutes in all)
+
+
+def ask_patiently(ask, task):
+    """Run ask() for work done BEFORE the meeting (facts table, scanned pages, context).
+
+    There is time then: when the LLM is busy or a per-minute limit is hit, wait and try again
+    instead of making you press Start again. A daily limit will not pass soon, so it is raised.
+    """
+    for wait in BUSY_WAITS + [None]:
+        try:
+            return ask()
+        except LLM_ERRORS as error:
+            problem = llm_error(error, task)
+            if wait is None or not isinstance(problem, RateLimitError) or problem.daily:
+                raise problem from error
+            time.sleep(wait)
 
 
 def llm_error(error, task):
