@@ -10,6 +10,8 @@ set "UV=uv"
 where uv >nul 2>&1 || set "UV=%USERPROFILE%\.local\bin\uv.exe"
 if not "%UV%"=="uv" if not exist "%UV%" (
   echo Getting uv %UV_VERSION%, the installer PreCue uses ^(once^)...
+  rem Started from PowerShell 7, Windows PowerShell would inherit its module paths and fail: clear them.
+  set "PSModulePath="
   powershell -NoProfile -ExecutionPolicy Bypass -Command "$env:UV_NO_MODIFY_PATH=1; irm https://astral.sh/uv/%UV_VERSION%/install.ps1 | iex" || goto failed
 )
 
