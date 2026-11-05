@@ -65,7 +65,7 @@ def save_keys(new_keys, env_file=None):
             raise ValueError(f"That does not look like a {KEYS[name]['name']} key.")
         clean[name] = value
 
-    lines = env_file.read_text().splitlines() if env_file.exists() else []
+    lines = env_file.read_text(encoding="utf-8").splitlines() if env_file.exists() else []
     for name, value in clean.items():
         line = f"{name}={value}"
         for i, old in enumerate(lines):
@@ -78,7 +78,7 @@ def save_keys(new_keys, env_file=None):
     # Write a private temporary file, then swap it in: .env is never half-written or readable by others.
     temporary = env_file.with_name(env_file.name + ".tmp")
     temporary.unlink(missing_ok=True)
-    with os.fdopen(os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600), "w") as file:
+    with os.fdopen(os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600), "w", encoding="utf-8") as file:
         file.write("\n".join(lines) + "\n")
     os.replace(temporary, env_file)
     os.environ.update(clean)

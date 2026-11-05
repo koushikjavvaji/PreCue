@@ -46,7 +46,7 @@ def folders(tmp_path, monkeypatch):
     monkeypatch.setattr(session, "UPLOADS", tmp_path / "uploads")
     monkeypatch.setattr(session, "SAMPLES", tmp_path / "samples")
     (tmp_path / "samples").mkdir()
-    (tmp_path / "samples" / "sample_report.txt").write_text("# Report\n\n## 1. Money\n\nRevenue was ₹10 crore.\n")
+    (tmp_path / "samples" / "sample_report.txt").write_text("# Report\n\n## 1. Money\n\nRevenue was ₹10 crore.\n", encoding="utf-8")
     monkeypatch.setattr(settings, "ENV_FILE", tmp_path / ".env")
     for name in settings.KEYS:
         monkeypatch.setenv(name, "test-key")
@@ -141,7 +141,7 @@ def test_too_big_body_is_refused(server, monkeypatch):
 
 def test_keys_are_saved_privately_and_other_lines_kept(folders):
     env = folders / ".env"
-    env.write_text("# my settings\nGROQ_API_KEY=old\nWHISPER_VOLUME=0.4\n")
+    env.write_text("# my settings\nGROQ_API_KEY=old\nWHISPER_VOLUME=0.4\n", encoding="utf-8")
     settings.save_keys({"GROQ_API_KEY": "gsk_new", "GEMINI_API_KEY": "AIza_new"}, env_file=env)
     assert env.read_text() == "# my settings\nGROQ_API_KEY=gsk_new\nWHISPER_VOLUME=0.4\nGEMINI_API_KEY=AIza_new\n"
     if sys.platform != "win32":  # Windows has no such permission bits
