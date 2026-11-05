@@ -110,7 +110,10 @@ def start(capturable):
     end = time.time() + 10
     while not screen.clients and time.time() < end:
         time.sleep(0.1)
-    assert screen.clients, "the overlay never connected to the live screen"
+    if not screen.clients:
+        stop_overlay(process)  # never leave a window behind when a test fails early
+        screen.server.shutdown()
+        raise AssertionError("the overlay never connected to the live screen")
     return screen, process, ready
 
 

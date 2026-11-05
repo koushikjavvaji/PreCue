@@ -82,7 +82,9 @@ class Overlay:
         command = [sys.executable, "-m", "app.overlay", self.screen.url] + (["--capturable"] if capturable else [])
         self.process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
         self.ready_line = self.process.stdout.readline().strip()  # waits until the window is set up
-        assert wait_for(lambda: len(self.screen.clients) == 1), "the overlay page never connected"
+        if not wait_for(lambda: len(self.screen.clients) == 1):
+            self.close()  # never leave a window behind when a test fails early
+            raise AssertionError("the overlay page never connected")
 
     def alert(self, text="You said 100 crore, the document says ₹10 crore (2. Revenue)."):
         self.screen.send({"type": "alert", "text": text, "time": "10:00:00"})
@@ -289,14 +291,23 @@ def fullscreen_meeting():
     from tests.fullscreen_app import GREEN
 
     process = subprocess.Popen([sys.executable, "-m", "tests.fullscreen_app"], stdout=subprocess.PIPE, text=True)
-    process.stdout.readline()
-    time.sleep(3)  # the full-screen animation
-    image = screenshot_with_screencapture()
-    green = (np.abs(image - np.array(GREEN)).max(axis=2) < 20).mean()
-    assert green > 0.8, f"the fake meeting is not full screen ({green:.0%} of the screen is green)"
-    yield
-    stop_overlay(process)
-    time.sleep(2)  # macOS leaves the full-screen space
+    try:  # always close it, also when the check below fails: a forgotten full-screen window takes over the screen
+        process.stdout.readline()
+
+        def green_share():
+            # The left half: the right side has the test backdrop (conftest.py). A normal window cannot fill it.
+            image = screenshot_with_screencapture()
+            left_half = image[:, : image.shape[1] // 2]
+            return (np.abs(left_half - np.array(GREEN)).max(axis=2) < 20).mean()
+
+        # The full-screen animation takes ~1 s, longer just after a previous test left full screen.
+        assert wait_for(lambda: green_share() > 0.9, timeout=10), \
+            f"the fake meeting is not full screen ({green_share():.0%} of the left half is green)"
+        time.sleep(0.5)  # let the animation settle
+        yield
+    finally:
+        stop_overlay(process)
+        time.sleep(2)  # macOS leaves the full-screen space
 
 
 @ui
