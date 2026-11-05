@@ -106,6 +106,13 @@ def test_gemini_answers_when_both_groq_models_cannot(monkeypatch):
     assert (main.asked, backup.asked, gemini.asked) == (1, 1, 1)
 
 
+def test_the_gemini_backup_can_be_turned_off(monkeypatch):
+    monkeypatch.setenv("GROQ_API_KEY", "test-key")
+    monkeypatch.setenv("GEMINI_API_KEY", "test-key")
+    monkeypatch.setenv("LIVE_GEMINI_BACKUP", "off")
+    assert model_name(groq_with_backup()) == "openai/gpt-oss-20b (backup: openai/gpt-oss-120b)"
+
+
 def test_a_rejected_groq_key_still_gets_an_answer_from_gemini(monkeypatch):
     monkeypatch.setenv("GROQ_API_KEY", "bad-key")
     monkeypatch.setenv("GEMINI_API_KEY", "test-key")
@@ -209,6 +216,18 @@ def test_groq_json_failure_is_tried_again(monkeypatch):
     monkeypatch.setenv("GROQ_API_KEY", "test-key")
     from app.llm import get_groq
     model = Flaky(bad_json())
+    monkeypatch.setattr("app.llm.ChatGroq.with_structured_output", lambda self, *a, **k: model)
+    assert structured(get_groq(), dict).invoke("hi") == "answer" and model.asked == 2
+
+
+def test_groq_generate_json_failure_is_tried_again_too(monkeypatch):
+    """Groq's other wording for the same problem, seen in a real run (same code: json_validate_failed)."""
+    monkeypatch.setenv("GROQ_API_KEY", "test-key")
+    from app.llm import get_groq
+    response = httpx.Response(400, request=httpx.Request("POST", "https://api.groq.com"))
+    error = groq.BadRequestError("Error code: 400 - {'error': {'message': \"Failed to generate JSON. Please adjust your prompt.\", "
+                                 "'type': 'invalid_request_error', 'code': 'json_validate_failed'}}", response=response, body=None)
+    model = Flaky(error)
     monkeypatch.setattr("app.llm.ChatGroq.with_structured_output", lambda self, *a, **k: model)
     assert structured(get_groq(), dict).invoke("hi") == "answer" and model.asked == 2
 

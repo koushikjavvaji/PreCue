@@ -84,7 +84,7 @@ def groq_with_backup():
     backups = []
     if backup_model and backup_model != main_model:
         backups.append(get_groq(backup_model))
-    if _has_key("GEMINI_API_KEY"):
+    if _has_key("GEMINI_API_KEY") and os.getenv("LIVE_GEMINI_BACKUP", "on").lower() != "off":
         backups.append(get_gemini(live=True))
     if not backups:
         return get_groq(main_model)
@@ -127,12 +127,13 @@ def structured(llm, schema):
 
 
 def _ask_twice_if_json_fails(shaped, prompt):
-    """Now and then (about 2 in 100) Groq answers "Failed to validate JSON": the model wrote an
-    answer that does not fit the shape. A second try almost always works."""
+    """Now and then (about 2 in 100) Groq answers "Failed to validate JSON" (or "...generate JSON"):
+    the model wrote an answer that does not fit the shape. A second try almost always works."""
     try:
         return shaped.invoke(prompt)
     except groq.BadRequestError as error:
-        if "validate JSON" not in str(error):
+        # "Failed to validate JSON" or "Failed to generate JSON": both carry this code.
+        if "json_validate_failed" not in str(error) and "validate JSON" not in str(error):
             raise
         return shaped.invoke(prompt)
 
