@@ -27,7 +27,7 @@ import torch
 from pydantic import BaseModel, Field
 
 from app.cache import cache_file, read_json, write_json
-from app.errors import PreCueError
+from app.errors import PreCueError, RateLimitError
 from app.llm import as_list, ask_patiently
 
 
@@ -67,10 +67,13 @@ period, never words like "earlier", "previous", "current", "now" or "last quarte
   - a goal or plan gets its target period (e.g. "Q3 FY2026 target")"""
 
 
-def extract_facts(chunks, document, llm, model_name, on_progress=None):
+def extract_facts(chunks, document, llm, model_name, on_progress=None, on_limit=None):
     """Return the facts table (a list of dicts) for the chunks of one document.
 
     on_progress(done, total) is called after each LLM call (the app shows a progress bar).
+    on_limit(error): if given, a free-tier limit does not stop everything: we keep the facts we
+    already have, call on_limit, and the meeting can go on (checks then use the text alone for the
+    rest). The missing facts are added the next time, from where it stopped.
     """
     path = cache_file("facts", model_name, document)
     cache = read_json(path) or {}
@@ -80,7 +83,13 @@ def extract_facts(chunks, document, llm, model_name, on_progress=None):
     todo = list(dict.fromkeys(text for text in texts if text not in cache))  # each new text once, in order
     todo_groups = groups(todo)
     for done, group in enumerate(todo_groups, start=1):
-        found = _ask_llm(readers, chunks[0].metadata["title"], group)
+        try:
+            found = _ask_llm(readers, chunks[0].metadata["title"], group)
+        except RateLimitError as error:
+            if on_limit is None:
+                raise
+            on_limit(error)
+            break
         for number, text in enumerate(group, start=1):
             # Keep a fact only if its value really is in its own part (the LLM can invent, or mix up parts).
             cache[text] = [
@@ -94,7 +103,7 @@ def extract_facts(chunks, document, llm, model_name, on_progress=None):
 
     table = []
     for chunk, text in zip(chunks, texts):
-        for fact in cache[text]:
+        for fact in cache.get(text, []):  # a part not read yet (free-tier limit) has no facts this time
             table.append({**fact, "section": chunk.metadata["section"], "chunk": chunk.metadata["chunk"]})
     return table
 

@@ -15,6 +15,10 @@ from app.llm import gemini_models, model_name
 from app.retriever import Retriever
 
 
+FACTS_INCOMPLETE = ("The facts table is incomplete for now: {error} PreCue still checks your numbers against "
+                    "the report's text, a little less precisely. The table completes itself the next time.")
+
+
 def prepare(path, mode="plain", embedder=None, report=None):
     """Return (retriever, facts) for the document at path. facts is a FactsTable.
 
@@ -36,7 +40,8 @@ def prepare(path, mode="plain", embedder=None, report=None):
     report("step", "Building the facts table")
     gemini = gemini_models()  # main + backup model; the main one names the cache
     rows = extract_facts(chunks, load_text(path), gemini, model_name=model_name(gemini[0]),
-                         on_progress=lambda done, total: report("progress", f"{done}/{total}"))
+                         on_progress=lambda done, total: report("progress", f"{done}/{total}"),
+                         on_limit=lambda error: report("warning", FACTS_INCOMPLETE.format(error=error)))
     return retriever, FactsTable(rows, embedder)
 
 

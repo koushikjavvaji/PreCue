@@ -378,3 +378,32 @@ def test_the_gemini_backup_model_is_set_up(monkeypatch):
     assert [m.model for m in gemini_models()] == ["gemini-3.5-flash-lite", "gemini-flash-lite-latest"]
     monkeypatch.setenv("GEMINI_BACKUP_MODEL", "")
     assert len(gemini_models()) == 1
+
+
+def test_a_daily_limit_leaves_an_incomplete_facts_table_not_a_failed_start(monkeypatch, tmp_path):
+    import app.cache
+    from app.facts import FactList, extract_facts
+
+    monkeypatch.setattr(app.cache, "CACHE_FOLDER", tmp_path)
+    monkeypatch.setattr("app.facts.CHUNKS_PER_CALL", 1)  # one call per chunk, to stop half way
+
+    class LimitAfterOne:
+        asked = 0
+
+        def with_structured_output(self, schema):
+            return self
+
+        def invoke(self, prompt):
+            self.asked += 1
+            if self.asked > 1:
+                raise rate_limit("Rate limit reached on tokens per day (TPD)")
+            return FactList(facts=[{"part": 1, "metric": "Revenue", "value": "10 crore", "period": "Q2"}])
+
+    chunks = [Document(page_content=text, metadata={"title": "T", "section": str(n), "chunk": n})
+              for n, text in enumerate(["Revenue was 10 crore.", "Headcount was 140."], start=1)]
+    limits = []
+    table = extract_facts(chunks, "doc", LimitAfterOne(), "model", on_limit=limits.append)
+    assert [row["value"] for row in table] == ["10 crore"]  # what was read before the limit is kept
+    assert len(limits) == 1 and limits[0].daily
+    with pytest.raises(RateLimitError):  # without on_limit, a limit still stops (scripts want that)
+        extract_facts(chunks, "doc2", LimitAfterOne(), "model")
