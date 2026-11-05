@@ -91,6 +91,10 @@ class Overlay:
     def close(self):
         stop_overlay(self.process)
         self.screen.server.shutdown()
+        # The window server can keep showing the window for a moment after the process ends;
+        # the next test must not see this one's alert.
+        wait_for(lambda: window_info() is None)
+        time.sleep(0.3)
 
 
 @pytest.fixture
