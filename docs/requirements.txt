@@ -1,0 +1,2 @@
+# The website backend (api/release.py) needs only the Python standard library.
+# This file stops Vercel from installing the app's requirements.txt from the folder above.
