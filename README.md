@@ -10,8 +10,13 @@ PreCue is not another voice chatbot. It is a real-time communication assistant t
 
 ### Quick start (no commands)
 
-1. [Download the ZIP](https://github.com/koushikjavvaji/PreCue/archive/refs/heads/main.zip) and unzip it.
-2. Double-click `PreCue.command` (Mac; the first time, right-click it and choose Open) or `PreCue.bat` (Windows).
+1. Paste one line into Terminal (Mac) or PowerShell (Windows). Run it again any time to update; your keys and reports are kept.
+   ```bash
+   curl -LsSf https://getprecue.vercel.app/install.sh | sh          # Mac
+   irm https://getprecue.vercel.app/install.ps1 | iex               # Windows (PowerShell)
+   ```
+   Or [download the ZIP](https://github.com/koushikjavvaji/PreCue/archive/refs/heads/main.zip), unzip it and double-click `PreCue.command` (Mac; the first time, right-click it and choose Open) or `PreCue.bat` (Windows).
+2. Next time, double-click `PreCue.command` or `PreCue.bat` in your `PreCue` folder.
    You do not need Python: the first start installs everything PreCue needs, Python included (a few minutes); after that it opens in seconds.
 3. The PreCue page opens in your browser: paste your three free keys once, drop in your report, press **Start**.
 

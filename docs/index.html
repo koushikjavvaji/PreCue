@@ -152,6 +152,12 @@
                     font-weight: 700; color: #fff; background: var(--orange); }
   .get li b { color: var(--text); display: block; }
   .get li a { color: var(--orange-dark); }
+  .cmd { display: flex; align-items: center; gap: 10px; margin-top: 10px; padding: 8px 8px 8px 12px; border-radius: 12px; background: #2b2a27; }
+  .cmd .os { flex: none; font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #fdba9f; width: 62px; }
+  .cmd code { flex: 1; min-width: 0; overflow-x: auto; white-space: nowrap; background: none; border: 0; color: #f5f2ea; padding: 0; font-size: 13px; }
+  .copy { flex: none; border: 0; border-radius: 8px; padding: 6px 12px; font: inherit; font-size: 13px; font-weight: 600; color: #fff; background: var(--orange); cursor: pointer; transition: background .2s; }
+  .copy:hover { background: var(--orange-dark); }
+  .alt { display: block; margin-top: 10px; color: var(--muted); font-size: 13.5px; }
   code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .88em; padding: 2px 7px; border-radius: 7px; background: var(--bg-2); border: 1px solid var(--line); color: var(--text); }
   .keys { display: grid; gap: 10px; align-content: start; }
   .key { display: flex; align-items: center; gap: 14px; padding: 14px 16px; border-radius: 16px; background: var(--card); border: 1px solid var(--line); text-decoration: none; box-shadow: var(--shadow); transition: all .25s var(--ease); }
@@ -317,8 +323,10 @@
     <div class="get">
       <div class="card reveal">
         <ol>
-          <li><b>Download PreCue</b>Get the <a href="https://github.com/koushikjavvaji/PreCue/archive/refs/heads/main.zip">ZIP file</a> and unzip it.</li>
-          <li><b>Double-click to start</b><code>PreCue.command</code> on a Mac (the first time: right-click it and choose Open), or <code>PreCue.bat</code> on Windows. The first start sets itself up in a few minutes; after that it opens in seconds.</li>
+          <li><b>Install with one line</b>Paste it into Terminal (Mac) or PowerShell (Windows). It downloads PreCue, sets everything up (a few minutes, once) and starts it. Run it again any time to update; your keys and reports are kept.
+            <div class="cmd"><span class="os">Mac</span><code id="cmd-mac">curl -LsSf https://getprecue.vercel.app/install.sh | sh</code><button type="button" class="copy" data-for="cmd-mac">Copy</button></div>
+            <div class="cmd"><span class="os">Windows</span><code id="cmd-win">irm https://getprecue.vercel.app/install.ps1 | iex</code><button type="button" class="copy" data-for="cmd-win">Copy</button></div>
+            <small class="alt">Or get the <a class="download" href="https://github.com/koushikjavvaji/PreCue/archive/refs/heads/main.zip">ZIP file</a>, unzip it and double-click <code>PreCue.command</code> (Mac: the first time, right-click it and choose Open) or <code>PreCue.bat</code>. Next time, start PreCue the same way.</small></li>
           <li><b>Add your three free keys</b>The PreCue page opens in your browser. Paste each key once; PreCue tests them for you.</li>
           <li><b>Drop in your report and press Start</b>Then join your call as usual.</li>
         </ol>
@@ -398,6 +406,17 @@
     document.getElementById("hero-info").textContent = info.stars > 0 ? ` ★ ${info.stars} on GitHub.` : ` Updated ${updated}.`;
     if (info.download.startsWith("https://github.com/")) for (const a of document.querySelectorAll("a.download")) a.href = info.download;
   }).catch(() => {});
+
+  // Copy buttons for the install commands.
+  for (const button of document.querySelectorAll(".copy")) {
+    button.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(document.getElementById(button.dataset.for).textContent);
+        button.textContent = "Copied";
+      } catch (e) { button.textContent = "Select and copy"; }
+      setTimeout(() => { button.textContent = "Copy"; }, 2000);
+    });
+  }
 
   // Sections fade in as you scroll to them.
   const io = new IntersectionObserver((entries) => entries.forEach((e) => { if (e.isIntersecting) { e.target.classList.add("seen"); io.unobserve(e.target); } }), { threshold: .12 });
